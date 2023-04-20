@@ -22,6 +22,8 @@ For #2, a dockerfile is provided that will install `q2dataflow` and also the lat
 Note that when a new release becomes available, it is currently necessary to update the qiime2 environment name used in the 
 dockerfile (e.g., changing `RUN echo "conda activate qiime2-2022.8"` to `RUN echo "conda activate qiime2-2023.2"`)
 
+If running on Mac, it is also necessary to install and run Docker Desktop.
+
 Using this dockerfile, a docker image can be built from the command line in the top `q2dataflow` directory using the command
 
 ```docker build docker/ --build-arg CACHEBUST=$(date +%s) --tag testq2dataflow```
