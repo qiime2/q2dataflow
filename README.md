@@ -29,3 +29,11 @@ Using this dockerfile, a docker image can be built from the command line in the 
 The name of the image, `testq2dataflow`, is important: it is used in generating
 the test commands in `q2dataflow\languages\wdl\usage.py`.  Currently, it is set
 in a variable in this module and should presumably be refactored to elsewhere.
+
+The tests generate wdl files and parameter files and then run each wdl file (using 
+the parameters in the associated parameters file) through `miniwdl` on the `testq2dataflow`
+docker image.  If the tests hang, go to a terminal, enter the conda environment 
+containing `miniwdl`, and run `miniwdl run_self_test`.  If *this* hangs due to
+errors stating "error while loading TLS certificate in 
+/var/lib/docker/swarm/certificates/swarm-node.crt", then run 
+`docker swarm leave --force` and try again.
