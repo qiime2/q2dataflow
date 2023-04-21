@@ -4,7 +4,7 @@
 
 `q2dataflow` requires installation of the following packages:
 
-* `qiime2`, including `qiime2.sdk`
+* `qiime2`, including `qiime2.sdk` and the `q2-mystery-stew` plugin
 * `click`
 * `pytest`
 
