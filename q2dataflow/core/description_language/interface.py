@@ -11,11 +11,11 @@ import click
 import qiime2.sdk as sdk
 
 from q2dataflow.core.description_language.drivers import \
-    action_runner, builtin_runner,get_version
+    action_runner, builtin_runner, get_version
 from q2dataflow.core.description_language import \
     (template_plugin_iter, template_all_iter, template_builtins_iter)
 
-_OUTPUT_DIR = click.Path(file_okay=False, dir_okay=True, exists=True)
+OUTPUT_DIR = click.Path(file_okay=False, dir_okay=True, exists=True)
 
 
 def _echo_status(status):

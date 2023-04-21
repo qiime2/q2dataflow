@@ -12,7 +12,7 @@ import q2dataflow.core.description_language.interface as clickin
 from q2dataflow.languages.wdl.templaters.helpers import q2wdl_prefix, \
     metafile_synth_param_prefix, reserved_param_prefix
 
-MODULE_NAME = "q2wdl_internal"
+MODULE_NAME = "module_name"
 
 
 def _make_metadata_param(curr_source, curr_col):
@@ -70,7 +70,7 @@ def _reformat_q2wdl_params(params_dict):
                           if x.startswith(q2wdl_prefix)]
     for curr_key in q2wdl_special_keys:
         if curr_key.startswith(metafile_synth_param_prefix):
-            new_dict = _reformat_metadata_param(curr_key, params_dict)
+            _reformat_metadata_param(curr_key, params_dict)
         elif curr_key.startswith(reserved_param_prefix):
             native_key = curr_key.replace(reserved_param_prefix, "")
             params_dict[native_key] = params_dict[curr_key]
@@ -87,30 +87,40 @@ def root():
 
 
 @root.group()
-def template():
+@click.pass_context
+def q2wdl(ctx):
+    ctx.obj = {MODULE_NAME: "q2dataflow.languages.wdl"}
+
+
+@q2wdl.group()
+@click.pass_context
+def template(ctx):
     pass
 
 
 @template.command()
 @click.argument('plugin', type=str)
-@click.argument('output', type=clickin._OUTPUT_DIR)
-def plugin(plugin, output):
-    clickin.plugin(plugin, output, MODULE_NAME)
+@click.argument('output', type=clickin.OUTPUT_DIR)
+@click.pass_context
+def plugin(ctx, plugin, output):
+    clickin.plugin(plugin, output, ctx.obj[MODULE_NAME])
 
 
 @template.command()
-@click.argument('output', type=clickin._OUTPUT_DIR)
-def builtins(output):
-    clickin.builtins(output, MODULE_NAME)
+@click.argument('output', type=clickin.OUTPUT_DIR)
+@click.pass_context
+def builtins(ctx, output):
+    clickin.builtins(output, ctx.obj[MODULE_NAME])
 
 
 @template.command()
-@click.argument('output', type=clickin._OUTPUT_DIR)
-def all(output):
-    clickin.all(output, MODULE_NAME)
+@click.argument('output', type=clickin.OUTPUT_DIR)
+@click.pass_context
+def all(ctx, output):
+    clickin.all(output, ctx.obj[MODULE_NAME])
 
 
-@root.command()
+@q2wdl.command()
 @click.argument('plugin', type=str)
 @click.argument('action', type=str)
 @click.argument('inputs', type=click.Path(file_okay=True, dir_okay=False,
