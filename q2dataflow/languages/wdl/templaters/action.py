@@ -119,7 +119,7 @@ task {self.tool_id} {{
     }}
 
     command {{ 
-        q2wdl run {self.plugin_id} {self.action_id} ~{{write_json(task_params)}}
+        q2dataflow q2wdl run {self.plugin_id} {self.action_id} ~{{write_json(task_params)}}
     }} 
     
     {self.get_outputs()}
