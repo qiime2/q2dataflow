@@ -30,3 +30,5 @@ jobs:
           context: ./docker
           push: true
           tags: localhost:5000/qiime2/testq2dataflow:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
