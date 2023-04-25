@@ -1,0 +1,11 @@
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  do_nothing:
+    runs-on: ubuntu-latest
+    steps:
+      - shell: bash
+        run: echo 'Replace me'
