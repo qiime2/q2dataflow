@@ -45,9 +45,9 @@ jobs:
           auto-activate-base: false
 
       - name: Install q2dataflow
-        shell: bash
+        shell: bash -el {0}
         run: pip install -e .
 
       - name: Run Tests
-        shell: bash
+        shell: bash -el {0}
         run: pytest --docker-image 'localhost:5000/qiime2/testq2dataflow'
