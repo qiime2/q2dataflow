@@ -46,7 +46,9 @@ jobs:
 
       - name: Install q2dataflow
         shell: bash -el {0}
-        run: pip install -e .
+        run: |
+          pip install -e .
+          pip install miniwdl
 
       - name: Run Tests
         shell: bash -el {0}
