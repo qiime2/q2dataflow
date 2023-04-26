@@ -50,4 +50,4 @@ jobs:
 
       - name: Run Tests
         shell: bash -el {0}
-        run: pytest -v --docker-image 'localhost:5000/qiime2/testq2dataflow'
+        run: pytest -v -x --docker-image 'localhost:5000/qiime2/testq2dataflow'
