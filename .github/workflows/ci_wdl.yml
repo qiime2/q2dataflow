@@ -52,4 +52,6 @@ jobs:
 
       - name: Run Tests
         shell: bash -el {0}
+        env:
+          SKIP_SLEEP: true
         run: pytest -v -x --docker-image 'localhost:5000/qiime2/testq2dataflow'
