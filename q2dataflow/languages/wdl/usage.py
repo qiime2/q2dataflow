@@ -20,9 +20,10 @@ class WdlTestUsage(CLIUsage):
     config_fname = f"{DOCKER_IMG_NAME}.config"
     params_json_fname = "tool_params.json"
 
-    def __init__(self, enable_assertions=False):
-        super().__init__(enable_assertions=enable_assertions,
+    def __init__(self, docker_image=DOCKER_IMG_NAME):
+        super().__init__(enable_assertions=True,
                          action_collection_size=None)
+        self.docker_image = docker_image
         self._wdltool = None
         self._miniwdl_fname = ""
 
@@ -64,7 +65,7 @@ class WdlTestUsage(CLIUsage):
 
         config_str = f"""[task_runtime]
 defaults = {{
-        "docker": "{DOCKER_IMG_NAME}:latest"
+        "docker": "{self.docker_image}:latest"
     }}
 """
         config_fp = os.path.join(working_dir, self.config_fname)

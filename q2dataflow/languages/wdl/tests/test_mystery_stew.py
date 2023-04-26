@@ -36,14 +36,14 @@ def get_tests():
 
 
 @pytest.mark.parametrize('action,example', get_tests(), ids=_labeler)
-def test_mystery_stew(action, example):
+def test_mystery_stew(action, example, docker_image):
     # TODO Discuss w Evan if better way to handle Docker Desktop crash due to
     #  lots of rapid start-up/shut-down cycles; for now, just give
     #  Docker Desktop some time to clear its mind between tests
     time.sleep(2)
 
     example_f = action.examples[example]
-    use = WdlTestUsage(enable_assertions=True)
+    use = WdlTestUsage(docker_image=docker_image)
     example_f(use)
     rendered = '\n'.join(use.recorder)
 
