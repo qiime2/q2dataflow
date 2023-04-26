@@ -5,7 +5,7 @@ on:
 
 jobs:
   build-docker:
-    name: 'Build Docker Container'
+    name: 'Test Generated WDL'
     runs-on: ubuntu-latest
     services:
        registry:
