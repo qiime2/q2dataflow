@@ -69,8 +69,7 @@ class WdlTool:
         input_strs = self._get_delimited_param_str(True, True, delimiter)
 
         if input_strs:
-            result = f"""
-    input {{
+            result = f"""input {{
         {input_strs}
     }}"""
         return result
@@ -85,8 +84,7 @@ class WdlTool:
         result = ""
         outputs_str = self._get_delimited_param_str(False, False, delimiter)
         if outputs_str:
-            result = f"""
-    output {{
+            result = f"""output {{
         {outputs_str}
     }}"""
         return result
@@ -105,23 +103,24 @@ class WdlTool:
         #munged_action_name = self.action_id.replace("_", "-")
 
         tool_str = f"""
-version 1.0       
+version 1.0
 
 struct {self.tool_id}_params {{
     {self.get_input_declarations()}
 }}
-        
+
 task {self.tool_id} {{
-{self.get_input_declarations_w_defaults()}
+
+    {self.get_input_declarations_w_defaults()}
 
     {self.tool_id}_params task_params = object {{
         {self.get_input_assignments()}
     }}
 
-    command {{ 
+    command {{
         q2dataflow q2wdl run {self.plugin_id} {self.action_id} ~{{write_json(task_params)}}
-    }} 
-    
+    }}
+
     {self.get_outputs()}
 
 }}
