@@ -11,7 +11,7 @@ To see rendered tools, visit:
 ## Roadmap
 This project is currently under active development, and additional languages and features will be made available soon.
 
- - **Phase 1**: Finalize WDL implementation, implement .dockstore.yml manfiest, automate per-plugin Docker builds, and publish WDL workflows to Dockstore.
+ - **Phase 1**: Finalize WDL implementation, implement .dockstore.yml manifest, automate per-plugin Docker builds, and publish WDL workflows to Dockstore.
  - **Phase 2**: Port [q2cwl](https://github.com/qiime2/q2cwl) to q2dataflow and publish CWL tools to Dockstore.
  - **Phase 3**: Add NextFlow (and potentially port Galaxy support from [q2galaxy](https://github.com/qiime2/q2galaxy)) and publish NextFlow tools to Dockstore.
 
