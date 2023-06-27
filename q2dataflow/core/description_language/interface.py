@@ -28,21 +28,22 @@ def _echo_status(status):
         click.secho(line, fg='yellow')
 
 
-def plugin(plugin, output, templater_lib_name):
+def plugin(plugin, output, templater_lib_name, settings=None):
     pm = sdk.PluginManager()
     plugin = pm.get_plugin(id=plugin)
 
-    for status in template_plugin_iter(plugin, output, templater_lib_name):
+    for status in template_plugin_iter(
+            plugin, output, templater_lib_name, settings):
         _echo_status(status)
 
 
-def builtins(output, templater_lib_name):
-    for status in template_builtins_iter(output, templater_lib_name):
+def builtins(output, templater_lib_name, settings=None):
+    for status in template_builtins_iter(output, templater_lib_name, settings):
         _echo_status(status)
 
 
-def all(output, templater_lib_name):
-    for status in template_all_iter(output, templater_lib_name):
+def all(output, templater_lib_name, settings=None):
+    for status in template_all_iter(output, templater_lib_name, settings):
         _echo_status(status)
 
 

@@ -1,8 +1,8 @@
 import json
 import os.path
 from q2cli.core.usage import CLIUsage, CLIUsageVariable
-from q2dataflow.languages.wdl.templaters.action import make_wdltool
-from q2dataflow.languages.wdl.util import write_tool
+from q2dataflow.languages.wdl.templaters.action import \
+    make_wdl_action_template, store_action_template_str
 
 DOCKER_IMG_NAME = "testq2dataflow"
 
@@ -18,13 +18,13 @@ class WdlTestUsageVariable(CLIUsageVariable):
 
 class WdlTestUsage(CLIUsage):
     config_fname = f"{DOCKER_IMG_NAME}.config"
-    params_json_fname = "tool_params.json"
+    params_json_fname = "template_params.json"
 
     def __init__(self, docker_image=DOCKER_IMG_NAME):
         super().__init__(enable_assertions=True,
                          action_collection_size=None)
         self.docker_image = docker_image
-        self._wdltool = None
+        self._wdl_template = None
         self._miniwdl_fname = ""
 
     def action(self, action, inputs, outputs):
@@ -41,7 +41,7 @@ class WdlTestUsage(CLIUsage):
         action_args = {**ins, **outs}
 
         action_f = action.get_action()
-        self._wdltool = make_wdltool(action.plugin_id, action_f, action_args)
+        self._wdl_template = make_wdl_action_template(action.plugin_id, action_f, action_args)
         self._miniwdl_fname = f"{action.plugin_id}_{action.action_id}.wdl"
 
         self.recorder.append("export MYSTERY_STEW=1")
@@ -60,8 +60,8 @@ class WdlTestUsage(CLIUsage):
 
     def save_wdl_run_files(self, working_dir):
         wdl_fp = os.path.join(working_dir, self._miniwdl_fname)
-        workflow_str = self._wdltool.make_workflow_str()
-        write_tool(workflow_str, wdl_fp)
+        workflow_str = self._wdl_template.make_workflow_str()
+        store_action_template_str(workflow_str, wdl_fp)
 
         config_str = f"""[task_runtime]
 defaults = {{
@@ -73,6 +73,6 @@ defaults = {{
             c.write(config_str)
 
         json_fp = os.path.join(working_dir, self.params_json_fname)
-        miniwdl_inputs = self._wdltool.make_input_dict()
+        miniwdl_inputs = self._wdl_template.make_input_dict()
         with open(json_fp, "w") as i:
             json.dump(miniwdl_inputs, i)

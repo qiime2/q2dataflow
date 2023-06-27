@@ -11,8 +11,11 @@ from qiime2.sdk.util import (interrogate_collection_type, is_semantic_type,
                              is_metadata_column_type)
 from qiime2.core.type.signature import ParameterSpec
 
+QIIME_STR_TYPE = "Str"
+QIIME_BOOL_TYPE = "Bool"
 
-def make_tool_id(plugin_id, action_id, replace_underscores=True):
+
+def make_action_template_id(plugin_id, action_id, replace_underscores=True):
     if replace_underscores:
         munged_plugin_id = plugin_id.replace('_', '-')
         munged_action_id = action_id.replace('_', '-')
@@ -25,10 +28,28 @@ def make_tool_id(plugin_id, action_id, replace_underscores=True):
 
 
 class ParamCase:
-    def __init__(self, name, spec, arg=None):
+    def __init__(self, name, spec, arg=None, type_name=None,
+                 is_optional=None, default=None):
         self.name = name
         self.spec = spec
         self.arg = arg
+
+        self.type_name = type_name
+        if type_name is None:
+            # TODO the below doesn't handle multiple qiime_types ... need
+            #  something for that case like
+            #  self.type_name = spec.qiime_type.fields[0].name maybe?
+            self.type_name = self.spec.qiime_type.name
+
+        self.default = default
+        self.is_optional = is_optional
+        # Unless we are explicitly told this param is optional, dig for it ...
+        if is_optional is None:
+            if spec:
+                if self.spec.has_default():
+                    if self.spec.default != self.spec.NOVALUE:
+                        self.is_optional = True
+                        self.default = self.spec.default
 
     def inputs(self):
         raise NotImplementedError(self.__class__)
