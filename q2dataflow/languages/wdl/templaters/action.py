@@ -5,8 +5,11 @@
 #
 # The full license is in the file LICENSE, distributed with this software.
 # ----------------------------------------------------------------------------
+from q2dataflow.languages.wdl.util import Q2_WDL_VERSION
 from q2dataflow.languages.wdl.templaters.helpers import WdlSignatureConverter
-from q2dataflow.core.signature_converter.case import make_tool_id
+from q2dataflow.core.signature_converter.case import make_action_template_id
+from q2dataflow.core.signature_converter.util import \
+    get_q2_version, get_copyright
 
 
 def _append_or_extend(content_holder, new_content):
@@ -17,32 +20,20 @@ def _append_or_extend(content_holder, new_content):
     return content_holder
 
 
-class WdlTool:
-    def __init__(self, plugin_id, action_id, tool_id):
-        self.plugin_id = plugin_id
-        self.action_id = action_id
-        self.tool_id = tool_id
-        self.wkflow_id = f"wkflw_{self.tool_id}"
-        self.param_cases = []
-        # self._inputs = []
-        # self._inputs_w_defaults = []
-        # self._inputs_w_args  = {}
-        # #self._keyval_strs = []
-        # self._outputs = []
+class WdlActionTemplate:
+    def __init__(self, plugin_id, action_id, template_id):
+        self._plugin_id = plugin_id
+        self._action_id = action_id
+        self._template_id = template_id
+        self._wkflow_id = f"wkflw_{self._template_id}"
+        self._param_cases = []
 
     def add_param(self, param_case):
-        self.param_cases.append(param_case)
-        # self._inputs = _append_or_extend(self._inputs, param_case.inputs())
-        # self._inputs_w_defaults = _append_or_extend(
-        #     self._inputs_w_defaults, param_case.inputs(include_defaults=True))
-        # self._inputs_w_args = self._inputs_w_args | param_case.inputs_w_args()
-        # # self._keyval_strs = _append_or_extend(
-        # #     self._keyval_strs, param_case.keyval_strs())
-        # self._outputs = _append_or_extend(self._outputs, param_case.outputs())
+        self._param_cases.append(param_case)
 
     def _get_param_strs(self, get_inputs, include_defaults):
         param_strs = []
-        for curr_param in self.param_cases:
+        for curr_param in self._param_cases:
             if get_inputs:
                 curr_param_strs = curr_param.inputs(include_defaults=include_defaults)
             else:
@@ -60,11 +51,11 @@ class WdlTool:
 
         return result
 
-    def get_input_declarations(self, delimiter="\n    "):
+    def _get_input_declarations(self, delimiter="\n    "):
         result = self._get_delimited_param_str(True, False, delimiter)
         return result
 
-    def get_input_declarations_w_defaults(self, delimiter="\n        "):
+    def _get_input_declarations_w_defaults(self, delimiter="\n        "):
         result = ""
         input_strs = self._get_delimited_param_str(True, True, delimiter)
 
@@ -74,13 +65,13 @@ class WdlTool:
     }}"""
         return result
 
-    def get_input_assignments(self, separator=": ", delimiter=",\n        "):
+    def _get_input_assignments(self, separator=": ", delimiter=",\n        "):
         inputs = self._get_param_strs(True, False)
         input_names_only = [x.split()[1] for x in inputs]
         input_name_pairs = [f"{x}{separator}{x}" for x in input_names_only]
         return delimiter.join(input_name_pairs)
 
-    def get_outputs(self, delimiter="\n        "):
+    def _get_outputs(self, delimiter="\n        "):
         result = ""
         outputs_str = self._get_delimited_param_str(False, False, delimiter)
         if outputs_str:
@@ -91,53 +82,51 @@ class WdlTool:
 
     def make_input_dict(self):
         input_dict = {}
-        for curr_param in self.param_cases:
+        for curr_param in self._param_cases:
             curr_input_dict = curr_param.args()
             for k, v in curr_input_dict.items():
                 # val = v if type(v) != set else list(v)
-                input_dict[f"{self.wkflow_id}.{k}"] = v
+                input_dict[f"{self._wkflow_id}.{k}"] = v
 
         return input_dict
 
-    def make_tool_str(self):
-        #munged_action_name = self.action_id.replace("_", "-")
-
-        tool_str = f"""
+    def _make_task_str(self):
+        task_str = f"""
 version 1.0
 
-struct {self.tool_id}_params {{
-    {self.get_input_declarations()}
+struct {self._template_id}_params {{
+    {self._get_input_declarations()}
 }}
 
-task {self.tool_id} {{
+task {self._template_id} {{
 
-    {self.get_input_declarations_w_defaults()}
+    {self._get_input_declarations_w_defaults()}
 
-    {self.tool_id}_params task_params = object {{
-        {self.get_input_assignments()}
+    {self._template_id}_params task_params = object {{
+        {self._get_input_assignments()}
     }}
 
     command {{
-        q2dataflow q2wdl run {self.plugin_id} {self.action_id} ~{{write_json(task_params)}}
+        q2dataflow q2wdl run {self._plugin_id} {self._action_id} ~{{write_json(task_params)}}
     }}
 
-    {self.get_outputs()}
+    {self._get_outputs()}
 
 }}
 """
-        return tool_str
+        return task_str
 
     def make_workflow_str(self):
-        tool_str = self.make_tool_str()
+        task_str = self._make_task_str()
 
         wrkflow_str = f"""
-{tool_str}
+{task_str}
 
-workflow {self.wkflow_id} {{
-{self.get_input_declarations_w_defaults()}
+workflow {self._wkflow_id} {{
+{self._get_input_declarations_w_defaults()}
 
-    call {self.tool_id} {{
-        input: {self.get_input_assignments(separator="=", delimiter=", ")}
+    call {self._template_id} {{
+        input: {self._get_input_assignments(separator="=", delimiter=", ")}
     }}
 
 }}
@@ -146,23 +135,36 @@ workflow {self.wkflow_id} {{
         return wrkflow_str
 
 
-def make_wdltool(plugin_id, action, arguments=None):
+def make_wdl_action_template(plugin_id, action, arguments=None):
     wdl_sig_converter = WdlSignatureConverter()
-    tool_id = make_tool_id(plugin_id, action.id, replace_underscores=False)
-    wdl_tool = WdlTool(plugin_id, action.id, tool_id)
+    template_id = make_action_template_id(plugin_id, action.id, replace_underscores=False)
+    wdl_template = WdlActionTemplate(plugin_id, action.id, template_id)
 
     cases = wdl_sig_converter.signature_to_param_cases(
         action.signature, arguments=arguments, include_outputs=True)
     for case in cases:
-        wdl_tool.add_param(case)
+        wdl_template.add_param(case)
 
-    return wdl_tool
+    return wdl_template
 
 
-def make_tool(conda_meta, plugin, action, make_workflow=True):
-    wdl_tool = make_wdltool(plugin.id, action)
+def make_action_template_str(settings, plugin, action):
+    wdl_template = make_wdl_action_template(plugin.id, action)
+    return wdl_template.make_workflow_str()
 
-    if make_workflow:
-        return wdl_tool.make_workflow_str()
-    else:
-        return wdl_tool.make_tool_str()
+
+def store_action_template_str(action_template_str, filepath):
+    temp_lines = []
+    temp_lines.append(get_copyright())
+    temp_lines.append(
+        "\nThis template was automatically generated by:\n"
+        f"    q2wdl (version: {Q2_WDL_VERSION})\n"
+        "for:\n"
+        f"    qiime2 (version: {get_q2_version()})\n")
+
+    temp_line_str = "\n".join(temp_lines)
+    commented_str = "# " + "\n# ".join(temp_line_str.split("\n"))
+    output_str = "\n".join([commented_str, action_template_str])
+
+    with open(filepath, 'w') as fh:
+        fh.write(output_str)

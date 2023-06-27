@@ -5,7 +5,22 @@
 #
 # The full license is in the file LICENSE, distributed with this software.
 # ----------------------------------------------------------------------------
+from datetime import datetime
+from qiime2 import __version__ as q2_version
 import qiime2.sdk as sdk
+
+
+def get_copyright():
+    copyright = f"""
+Copyright (c) {datetime.now().year}, QIIME 2 development team.
+
+Distributed under the terms of the Modified BSD License. (SPDX: BSD-3-Clause)
+"""
+    return copyright
+
+
+def get_q2_version():
+    return q2_version
 
 
 def get_mystery_stew():
