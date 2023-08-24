@@ -103,7 +103,7 @@ def wdl(ctx):
     ctx.obj = {MODULE_NAME: "q2dataflow.languages.wdl"}
 
 
-@wdl.group()
+@wdl.group("template", short_help="Generate WDL workflow templates from available actions")
 @click.pass_context
 def wdl_template(ctx):
     pass
@@ -131,12 +131,12 @@ def all(ctx, output):
     clickin.all(output, ctx.obj[MODULE_NAME], True)
 
 
-@wdl.command()
+@wdl.command("run", help="Do not use directly: used internally by q2dataflow wdl")
 @click.argument('plugin', type=str)
 @click.argument('action', type=str)
-@click.argument('inputs', type=click.Path(file_okay=True, dir_okay=False,
+@click.argument('inputs-json', type=click.Path(file_okay=True, dir_okay=False,
                                           exists=True))
-def run(plugin, action, inputs_json):
+def run_wdl(plugin, action, inputs_json):
     with open(inputs_json, 'r') as fh:
         config = json.load(fh)
 
@@ -153,7 +153,7 @@ def cwl(ctx):
     ctx.obj = {MODULE_NAME: "q2dataflow.languages.cwl"}
 
 
-@cwl.group(short_help="Template CWL Tool descriptions from available actions")
+@cwl.group(name="template", short_help="Generate CWL tool templates from available actions")
 @click.pass_context
 def cwl_template(ctx):
     pass
@@ -218,17 +218,22 @@ def docker(ctx, image_id: str, tools: bool = True, availability: str = 'remote',
     clickin.all(output_dir, ctx.obj[MODULE_NAME], quiet, settings=ctx.obj)
 
 
-@cwl.command()
-@click.command(help="Do not use directly, used internally by q2dataflow cwl.")
+@cwl.command(name="run", help="Do not use directly: used internally by q2dataflow cwl")
 @click.argument('plugin', type=str)
 @click.argument('action', type=str)
 @click.argument('inputs-json',
                 type=click.Path(file_okay=True, dir_okay=False, exists=True))
-def run(plugin, action, inputs_json):
+def run_cwl(plugin, action, inputs_json):
     with open(inputs_json, 'r') as fh:
         config = json.load(fh)['inputs']
 
     clickin.run(plugin, action, config, parse_primitives=True)
+
+
+def test_template_plugin():
+    cli_runner = CliRunner()
+    result = cli_runner.invoke(cwl, ['template', 'conda', '--plugin', 'composition', '~/Temp/q2cwl'])
+    print(result)
 
 
 if __name__ == '__main__':
