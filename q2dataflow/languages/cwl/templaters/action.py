@@ -8,23 +8,27 @@
 import collections
 import locale
 import yaml
-from q2dataflow.languages.cwl.templaters.helpers import CwlSignatureConverter
+from q2dataflow.core.signature_converter.templaters.action import \
+    DataflowActionTemplate
 from q2dataflow.core.signature_converter.case import make_action_template_id
+from q2dataflow.languages.cwl.templaters.helpers import CwlSignatureConverter
 
 
-class CwlActionTemplate:
-    def __init__(self, plugin, action, template_id, settings):
-        self._plugin_id = plugin.id
-        self._action_id = action.id
+class CwlActionTemplate(DataflowActionTemplate):
+    def __init__(self, plugin_id, action_id, template_id, label, doc, settings):
+        super().__init__(plugin_id, action_id, template_id)
         self._template_id = template_id
         self._settings = settings
 
-        self.template_dict = self._root_structure()
-        self.template_dict['id'] = self._template_id
-        self.template_dict['label'] = action.name
-        self.template_dict['doc'] = action.description
-        self.template_dict['arguments'] = [
-            plugin.name.replace('-', '_'), action.id, 'inputs.json']
+        self._template_dict = self._root_structure()
+        self._template_dict['id'] = self._template_id
+        self._template_dict['label'] = label
+        if doc is not None:
+            self._template_dict['doc'] = doc
+        # Note: cwl speaks yaml, but this is setting up an eventual argument to
+        # q2dataflow.__main__.run, which take a *json* input file.
+        self._template_dict['arguments'] = [
+            plugin_id.replace('-', '_'), action_id, 'inputs.json']
 
     def _root_structure(self):
         template_dict = collections.OrderedDict()
@@ -79,19 +83,23 @@ class CwlActionTemplate:
         return req
 
     def add_param(self, param_case):
-        self.template_dict['inputs'].update(param_case.inputs())
-        self.template_dict['outputs'].update(param_case.outputs())
+        self._param_cases.append(param_case)  # this is what superclass does
+        self._template_dict['inputs'].update(param_case.inputs())
+        self._template_dict['outputs'].update(param_case.outputs())
 
     def make_template_str(self):
         template_str = yaml.dump(
-            self.template_dict, default_flow_style=False, indent=2)
+            self._template_dict, default_flow_style=False, indent=2)
         return template_str
 
 
-def make_cwl_action_template(plugin, action, settings, arguments=None):
+# Required public functions
+def make_action_template(plugin_id, action, settings, arguments=None):
     template_id = make_action_template_id(
-        plugin, action.id, replace_underscores=False)
-    cwl_template = CwlActionTemplate(plugin, action, template_id, settings)
+        plugin_id, action.id, replace_underscores=False)
+    cwl_template = CwlActionTemplate(
+        plugin_id, action.id, template_id, action.name, action.description,
+        settings)
 
     cwl_sig_converter = CwlSignatureConverter()
     cases = cwl_sig_converter.signature_to_param_cases(
@@ -102,8 +110,8 @@ def make_cwl_action_template(plugin, action, settings, arguments=None):
     return cwl_template
 
 
-def make_action_template_str(settings, plugin, action):
-    cwl_template = make_cwl_action_template(plugin.id, action, settings)
+def make_action_template_str(plugin, action, settings):
+    cwl_template = make_action_template(plugin, action, settings)
     return cwl_template.make_template_str()
 
 

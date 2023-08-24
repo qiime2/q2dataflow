@@ -43,9 +43,7 @@ def _store_action_template_str_iter(action_template_str, path, templater_lib):
 
 
 def _template_action_iter(plugin, action, directory, templater_lib, settings):
-    if settings is None:
-        settings = {}
-    settings["conda_meta"] = _environment.find_conda_meta()
+    settings = _add_env_meta_to_settings(settings)
 
     filename = templater_lib.make_action_template_id(
         plugin.id, action.id) + templater_lib.get_extension()
@@ -56,8 +54,10 @@ def _template_action_iter(plugin, action, directory, templater_lib, settings):
     try:
         # generate a string holding the action template in the relevant language
         action_template_str = templater_lib.make_action_template_str(
-            settings, plugin, action)
-    except:  # noqa E722
+            plugin, action, settings=settings)
+    except Exception as ex:  # noqa E722
+        tb = traceback.format_exc()
+        print(tb)
         yield {'status': 'error', 'type': 'file',
                'path': plugin.id + "_" + action.id}
 
@@ -93,7 +93,7 @@ def template_plugin_iter(plugin, directory, templater_lib_name, settings):
 def template_builtins_iter(directory, templater_lib_name, settings):
     templater_lib = importlib.import_module(templater_lib_name)
 
-    meta = _environment.find_conda_meta()
+    settings = _add_env_meta_to_settings(settings)
 
     # create a dir to store the templates for the builtin actions
     suite_name = 'suite_qiime2_tools'
@@ -104,7 +104,7 @@ def template_builtins_iter(directory, templater_lib_name, settings):
             templater_lib.BUILTIN_MAKERS.items():
         # generate string holding the action template in the relevant language
         action_template_str = action_template_str_maker(
-            meta, action_template_id, settings)
+            action_template_id, settings)
 
         # write out the tool template string to the filepath specified;
         # the enclosing dirs will be created if they don't exist yet
@@ -121,3 +121,10 @@ def template_all_iter(directory, templater_lib_name, settings):
             plugin, directory, templater_lib_name, settings)
 
     yield from template_builtins_iter(directory, templater_lib_name, settings)
+
+
+def _add_env_meta_to_settings(settings):
+    if settings is None:
+        settings = {}
+    settings["conda_meta"] = _environment.find_conda_meta()
+    return settings

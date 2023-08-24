@@ -18,33 +18,37 @@ from q2dataflow.core.description_language import \
 OUTPUT_DIR = click.Path(file_okay=False, dir_okay=True, exists=True)
 
 
-def _echo_status(status):
+def _echo_status(status, quiet: bool = False):
+    if status is None:
+        return
+
+    # TODO: q2cwl echo_status is a lot more verbose ... do I need to reproduce?
     line = json.dumps(status)
     if status['status'] == 'error':
         click.secho(line, fg='red', err=True)
-    elif status['status'] == 'created':
+    elif status['status'] == 'created' and not quiet:
         click.secho(line, fg='green')
     else:
         click.secho(line, fg='yellow')
 
 
-def plugin(plugin, output, templater_lib_name, settings=None):
+def plugin(plugin, output, templater_lib_name, quiet, settings=None):
     pm = sdk.PluginManager()
     plugin = pm.get_plugin(id=plugin)
 
     for status in template_plugin_iter(
             plugin, output, templater_lib_name, settings):
-        _echo_status(status)
+        _echo_status(status, quiet)
 
 
-def builtins(output, templater_lib_name, settings=None):
+def builtins(output, templater_lib_name, quiet, settings=None):
     for status in template_builtins_iter(output, templater_lib_name, settings):
-        _echo_status(status)
+        _echo_status(status, quiet)
 
 
-def all(output, templater_lib_name, settings=None):
+def all(output, templater_lib_name, quiet, settings=None):
     for status in template_all_iter(output, templater_lib_name, settings):
-        _echo_status(status)
+        _echo_status(status, quiet)
 
 
 def run(plugin, action, config, parse_primitives=False):

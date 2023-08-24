@@ -88,16 +88,13 @@ def _make_array_inputs(name, array_inner_type, is_optional, default,
 
 
 class WdlParamCase(ParamCase):
+    dataflow_prefix = q2wdl_prefix
+    _dataflow_keywords = _wdl_keywords_v1
+
     def __init__(self, name, spec, arg=None, type_name=None,
                  is_optional=None, default=None):
         super().__init__(
             name, spec, arg, type_name, is_optional, default)
-
-        if self.name in _wdl_keywords_v1:
-            # can't use this as a param name bc it is a wdl reserved word
-            self.name = reserved_param_prefix + self.name
-
-        self.synth_param_name = None
 
     def _make_input_dec(self):
         return _make_basic_input_dec(
@@ -215,6 +212,10 @@ class WdlPrimitiveUnionCase(WdlParamCase):
     def args(self):
         arg_val = self.arg
         result = {}
+
+        # Note: for any primitive union that allows more than one type,
+        # q2dataflow wdl treats its variable as a string type (see above), so
+        # in this case we need to convert the arg value into a string
         if len(self.qtype_names) > 1:
             if arg_val is not None:
                 arg_val = str(self.arg)
@@ -231,14 +232,9 @@ class WdlColumnTabularCase(WdlParamCase):
             raise ValueError("Unexpected type of input parameter 'arg'")
         super().__init__(name, spec, arg)
 
+        # Note: here the synth param holds the file name
+        # and the "regular" param name holds the column name
         self.synth_param_name = f"{metafile_synth_param_prefix}{self.name}"
-
-    def get_file_or_col_arg(self, get_col=False):
-        result = None
-        if self.arg is not None:
-            tuple_index = int(get_col)
-            result = self.arg[tuple_index]
-        return result
 
     def inputs(self, include_defaults=False):
         if self.is_optional:
@@ -256,9 +252,10 @@ class WdlColumnTabularCase(WdlParamCase):
     def args(self):
         result = {}
         if self.arg is not None:
-            result = {self.name: self.get_file_or_col_arg(get_col=True),
-                      self.synth_param_name: self.get_file_or_col_arg(
-                          get_col=False)}
+            # expect argument to be in the form of a tuple where the first
+            # element is the file name and the second is the column name
+            result = {self.name: self.arg[1],
+                      self.synth_param_name: self.arg[0]}
 
         return result
 
@@ -294,6 +291,9 @@ class WdlSimpleCollectionCase(BaseSimpleCollectionCase, WdlParamCase):
         if len(self.qtype_names) > 1:
             if args is not None:
                 for curr_arg in args:
+                    # again, if there are multiple types, q2dataflow wdl treats
+                    # the param's variable as a string, so all arguments to
+                    # that variable need to be converted to strings
                     str_args.append(str(curr_arg))
         if len(str_args) > 0:
             args = str_args

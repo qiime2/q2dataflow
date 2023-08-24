@@ -7,7 +7,7 @@
 # ----------------------------------------------------------------------------
 import types
 
-from q2dataflow.languages.wdl.templaters.action import \
+from q2dataflow.languages.wdl.templaters.action import make_action_template, \
     make_action_template_str, store_action_template_str
 from q2dataflow.languages.wdl.templaters.import_export import \
     make_builtin_import_template_str, make_builtin_export_template_str
@@ -20,5 +20,6 @@ BUILTIN_MAKERS = types.MappingProxyType({
 })
 
 
-__all__ = ['make_action_template_str', 'store_action_template_str',
-           'make_action_template_id', 'BUILTIN_MAKERS']
+__all__ = ['make_action_template_id', 'make_action_template',
+           'make_action_template_str', 'store_action_template_str',
+           'BUILTIN_MAKERS']
