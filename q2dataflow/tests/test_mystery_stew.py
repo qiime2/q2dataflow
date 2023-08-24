@@ -50,8 +50,6 @@ def _test_mystery_stew(action, example, test_usage_factory, settings=None):
     rendered = '\n'.join(test_usage.recorder)
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        # TODO: take out debug setting
-        # tmpdir = "/Users/abirmingham/Desktop"
         for ref, data in test_usage.get_example_data():
             data.save(os.path.join(tmpdir, ref))
 
