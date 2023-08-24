@@ -13,14 +13,18 @@ import subprocess
 import tempfile
 from q2dataflow.core.signature_converter.util import get_mystery_stew
 from q2dataflow.languages.wdl.usage import WdlTestUsage
+from q2dataflow.languages.cwl.usage import CwlTestUsage
 import time
 import pytest
 
 
-def _labeler(val):
+def _labeler(val, prefix=None):
+    return_val = val
     if hasattr(val, 'id'):
-        return val.id
-    return val
+        return_val = val.id
+    if prefix is not None:
+        return_val = f"{prefix}_{return_val}"
+    return return_val
 
 
 def get_tests():
@@ -35,23 +39,24 @@ def get_tests():
     return tests
 
 
-@pytest.mark.parametrize('action,example', get_tests(), ids=_labeler)
-def test_mystery_stew(action, example, docker_image):
+def _test_mystery_stew(action, example, test_usage_factory, settings=None):
     if os.environ.get('SKIP_SLEEP') is None:
         # Prevent docker-desktop crash
         time.sleep(1)
 
     example_f = action.examples[example]
-    use = WdlTestUsage(docker_image=docker_image)
-    example_f(use)
-    rendered = '\n'.join(use.recorder)
+    test_usage = test_usage_factory(settings=settings)
+    example_f(test_usage)
+    rendered = '\n'.join(test_usage.recorder)
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        for ref, data in use.get_example_data():
+        # TODO: take out debug setting
+        # tmpdir = "/Users/abirmingham/Desktop"
+        for ref, data in test_usage.get_example_data():
             data.save(os.path.join(tmpdir, ref))
 
         try:
-            use.save_wdl_run_files(tmpdir)
+            test_usage.save_run_files(tmpdir)
         except NotImplementedError:
             # skip, not fail, tests for known not-implemented functionality
             pytest.skip(f"No implementation supporting {action.id} {example}")
@@ -62,3 +67,13 @@ def test_mystery_stew(action, example, docker_image):
                        check=True,
                        cwd=tmpdir,
                        env={**os.environ})
+
+
+# @pytest.mark.parametrize('action,example', get_tests(), ids=lambda x: _labeler(x, "wdl"))
+# def test_wdl_mystery_stew(action, example):
+#     _test_mystery_stew(action, example, WdlTestUsage)
+
+
+@pytest.mark.parametrize('action,example', get_tests(), ids=lambda x: _labeler(x, "cwl"))
+def test_cwl_mystery_stew(action, example):
+    _test_mystery_stew(action, example, CwlTestUsage, settings={"conda": True})

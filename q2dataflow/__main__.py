@@ -11,6 +11,8 @@ import json
 import q2dataflow.core.description_language.interface as clickin
 from q2dataflow.languages.wdl.templaters.helpers import q2wdl_prefix, \
     metafile_synth_param_prefix, reserved_param_prefix
+import q2dataflow.languages.wdl.util as wdl_util
+import q2dataflow.languages.cwl.util as cwl_util
 
 MODULE_NAME = "module_name"
 
@@ -86,47 +88,56 @@ def root():
     pass
 
 
+# Q2 plugin version
+@root.command()
+@click.argument('plugin', type=str)
+def version(plugin):
+    clickin.version(plugin)
+
+
+# WDL
 @root.group()
+@click.version_option(wdl_util.Q2_WDL_VERSION)
 @click.pass_context
-def q2wdl(ctx):
+def wdl(ctx):
     ctx.obj = {MODULE_NAME: "q2dataflow.languages.wdl"}
 
 
-@q2wdl.group()
+@wdl.group()
 @click.pass_context
-def template(ctx):
+def wdl_template(ctx):
     pass
 
 
-@template.command()
+@wdl_template.command()
 @click.argument('plugin', type=str)
 @click.argument('output', type=clickin.OUTPUT_DIR)
 @click.pass_context
 def plugin(ctx, plugin, output):
-    clickin.plugin(plugin, output, ctx.obj[MODULE_NAME])
+    clickin.plugin(plugin, output, ctx.obj[MODULE_NAME], True)
 
 
-@template.command()
+@wdl_template.command()
 @click.argument('output', type=clickin.OUTPUT_DIR)
 @click.pass_context
 def builtins(ctx, output):
-    clickin.builtins(output, ctx.obj[MODULE_NAME])
+    clickin.builtins(output, ctx.obj[MODULE_NAME], True)
 
 
-@template.command()
+@wdl_template.command()
 @click.argument('output', type=clickin.OUTPUT_DIR)
 @click.pass_context
 def all(ctx, output):
-    clickin.all(output, ctx.obj[MODULE_NAME])
+    clickin.all(output, ctx.obj[MODULE_NAME], True)
 
 
-@q2wdl.command()
+@wdl.command()
 @click.argument('plugin', type=str)
 @click.argument('action', type=str)
 @click.argument('inputs', type=click.Path(file_okay=True, dir_okay=False,
                                           exists=True))
-def run(plugin, action, inputs):
-    with open(inputs, 'r') as fh:
+def run(plugin, action, inputs_json):
+    with open(inputs_json, 'r') as fh:
         config = json.load(fh)
 
     config = _reformat_q2wdl_params(config)
@@ -134,10 +145,90 @@ def run(plugin, action, inputs):
     clickin.run(plugin, action, config, parse_primitives=True)
 
 
-@root.command()
+# CWL
+@root.group()
+@click.version_option(cwl_util.Q2_CWL_VERSION)
+@click.pass_context
+def cwl(ctx):
+    ctx.obj = {MODULE_NAME: "q2dataflow.languages.cwl"}
+
+
+@cwl.group(short_help="Template CWL Tool descriptions from available actions")
+@click.pass_context
+def cwl_template(ctx):
+    pass
+
+
+@cwl_template.command(short_help="For use within a Conda environment")
+@click.option('--plugin', required=False, help='Template only a single plugin')
+@click.option('--tools/--no-tools', default=True, help='Include QIIME 2 tools')
+@click.option('--quiet/--no-quiet', default=False)
+@click.argument('output-dir', type=click.Path(file_okay=False, writable=True))
+@click.pass_context
+def conda(ctx, output_dir: str, tools: bool = True, plugin: str = None,
+          quiet: bool = False):
+
+    ctx.obj["conda"] = True
+
+    if plugin:
+        clickin.plugin(plugin, output_dir, ctx.obj[MODULE_NAME],
+                       quiet, settings=ctx.obj)
+        if tools:
+            clickin.builtins(output_dir, ctx.obj[MODULE_NAME],
+                             quiet, settings=ctx.obj)
+    else:
+        # TODO: no good way NOT to do tools when doing all ...
+        clickin.all(output_dir, ctx.obj[MODULE_NAME], quiet, settings=ctx.obj)
+
+
+def _temp_inner_conda(ctx, output_dir: str, tools: bool = True,
+                      plugin: str = None, quiet: bool = False):
+
+    ctx.obj["conda"] = True
+
+    if plugin:
+        clickin.plugin(plugin, output_dir, ctx.obj[MODULE_NAME],
+                       quiet, settings=ctx.obj)
+        if tools:
+            clickin.builtins(output_dir, ctx.obj[MODULE_NAME],
+                             quiet, settings=ctx.obj)
+    else:
+        clickin.all(output_dir, ctx.obj[MODULE_NAME], quiet, settings=ctx.obj)
+
+
+@cwl_template.command(short_help="For use within a Docker container")
+# TODO: don't have an easy way to leave tools out ... ignoring for now
+@click.option('--tools/--no-tools', default=True, help='Include QIIME 2 tools')
+@click.option('--remote', 'availability', flag_value='remote', default=True,
+              help='Image is available on hub.docker.com (default)')
+@click.option('--local', 'availability', flag_value='local',
+              help='Image is only available on current host.')
+@click.option('--quiet/--no-quiet', default=False)
+@click.argument('image-id')
+@click.pass_context
+def docker(ctx, image_id: str, tools: bool = True, availability: str = 'remote',
+           quiet: bool = False):
+
+    output_dir = '/tmp/cwl-tools/'
+    ctx.obj["docker"] = {
+        "image_id": image_id,
+        "availability": availability
+    }
+
+    clickin.all(output_dir, ctx.obj[MODULE_NAME], quiet, settings=ctx.obj)
+
+
+@cwl.command()
+@click.command(help="Do not use directly, used internally by q2dataflow cwl.")
 @click.argument('plugin', type=str)
-def version(plugin):
-    clickin.version(plugin)
+@click.argument('action', type=str)
+@click.argument('inputs-json',
+                type=click.Path(file_okay=True, dir_okay=False, exists=True))
+def run(plugin, action, inputs_json):
+    with open(inputs_json, 'r') as fh:
+        config = json.load(fh)['inputs']
+
+    clickin.run(plugin, action, config, parse_primitives=True)
 
 
 if __name__ == '__main__':

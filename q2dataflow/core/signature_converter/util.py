@@ -26,20 +26,24 @@ def get_q2_version():
 def get_mystery_stew():
     from q2_mystery_stew.plugin_setup import create_plugin
 
-    pm = sdk.PluginManager(add_plugins=False)
+    try:
+        pm = sdk.PluginManager.reuse_existing()
+    except sdk.UninitializedPluginManagerError:
+        pm = sdk.PluginManager(add_plugins=False)
 
-    test_plugin = create_plugin(
-        ints=True,
-        strings=True,
-        bools=True,
-        floats=True,
-        artifacts=True,
-        primitive_unions=True,
-        metadata=True,
-        collections=True,
-        outputs=True,
-        typemaps=True
-    )
+        test_plugin = create_plugin(
+            ints=True,
+            strings=True,
+            bools=True,
+            floats=True,
+            artifacts=True,
+            primitive_unions=True,
+            metadata=True,
+            collections=True,
+            outputs=True,
+            typemaps=True
+        )
 
-    pm.add_plugin(test_plugin)
+        pm.add_plugin(test_plugin)
+
     return pm.get_plugin(id='mystery_stew')

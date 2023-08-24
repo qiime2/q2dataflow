@@ -21,18 +21,18 @@ _cwl_keywords_v1 = set()
 
 
 class CwlParamCase(ParamCase):
+    dataflow_prefix = q2cwl_prefix
+    _dataflow_keywords = _cwl_keywords_v1
+
     def __init__(self, name, spec, arg=None, type_name=None,
                  is_optional=None, default=None):
-        super().__init__(name, spec, arg, type_name, is_optional, default)
-
-        if self.name in _cwl_keywords_v1:
-            # can't use this as a param name bc it is a cwl reserved word
-            self.name = reserved_param_prefix + self.name
+        super(CwlParamCase, self).__init__(
+            name, spec, arg=arg, type_name=type_name,
+            is_optional=is_optional, default=default)
 
         self._suffix = ''
-        if spec.has_default():
-            if spec.default is None:
-                self._suffix += '?'
+        if self.is_optional and self.default is None:
+            self._suffix += '?'
 
     def _make_doc_str(self):
         result = None
@@ -40,20 +40,31 @@ class CwlParamCase(ParamCase):
             result = self.spec.description
         return result
 
+    def _make_param_dict(self, type_or_types):
+        name_dict = {
+            'type': type_or_types,
+            'doc': self._make_doc_str(),
+        }
+        if self.is_optional and self.default is not None:
+            name_dict['default'] = self.default
+
+        param_dict = {
+            self.name: name_dict
+        }
+
+        return param_dict
+
     def inputs(self):
         if self.type_name in _internal_to_cwl_type:
             cwl_type = _internal_to_cwl_type[self.type_name] + self._suffix
-            param_dict = {
-                self.name: {
-                    'type': cwl_type,
-                    'doc': self._make_doc_str(),
-                    'default': self.default
-                }
-            }
+            param_dict = self._make_param_dict(cwl_type)
         else:
             raise Exception("Unknown type: %r" % self.type_name)
 
         return param_dict
+
+    def outputs(self):
+        return {}
 
 
 class CwlInputCase(CwlParamCase):
@@ -70,7 +81,7 @@ class CwlInputCase(CwlParamCase):
     def inputs(self):
         if self.multiple:
             self._suffix = "[]"
-        if self.spec.has_default() and self.spec.default is not None:
+        if self.spec and self.spec.has_default() and self.spec.default is not None:
             raise NotImplementedError("inputs with non-None default values")
         cwl_type = _cwl_file_type + self._suffix
 
@@ -120,28 +131,17 @@ class CwlPrimitiveUnionCase(CwlParamCase):
         if not type_list:
             type_list = []
             for union_member_name in self.qtype_names:
-                type_list.append(_internal_to_cwl_type[union_member_name])
+                curr_cwl_type = _internal_to_cwl_type[union_member_name]
+                if curr_cwl_type not in type_list:
+                    type_list.append(curr_cwl_type)
 
         # TODO: import/export inputs and outputs, which explicitly specify
         #  their file types, don't have default values.  I see no reason why
         #  they cannot or should not.
         #  This implementation WILL NOT match the current cwl implementation
         #  specifically for the import/export inputs and outputs.
-        name_params = {
-                'type': type_list,
-                'doc': self._make_doc_str(),
-                'default': self.default
-        }
 
-        # TODO: Similarly, only inputs and outputs have labels in the current
-        #  implementation, although again I see no reason for that in the cwl
-        #  specs.  However, to preserve matching with the existing cwl for
-        #  general primitive unions, I have added this hack.  I think we should
-        #  take it out and add labels for everything ...
-        if self.cwl_type_names:
-            name_params['label'] = self.name
-
-        param_dict = {name_params}
+        param_dict = self._make_param_dict(type_list)
         return param_dict
 
 
@@ -150,6 +150,10 @@ class CwlColumnTabularCase(CwlParamCase):
         if arg is not None and type(arg) != tuple:
             raise ValueError("Unexpected type of input parameter 'arg'")
         super().__init__(name, spec, arg)
+
+        # Note: here the synth param holds the column name
+        # and the "regular" param name holds the file name
+        self.synth_param_name = self.name + '_column'
 
     def inputs(self):
         if self.default is not None:
@@ -161,7 +165,7 @@ class CwlColumnTabularCase(CwlParamCase):
                 'type': _cwl_file_type,
                 'doc': self._make_doc_str(),
             },
-            (self.name + '_column'): {
+            self.synth_param_name: {
                 'type': 'string',
                 'doc': 'Column name to use from %r' % self.name,
             }
@@ -169,11 +173,25 @@ class CwlColumnTabularCase(CwlParamCase):
 
         return output_dict
 
+    def args(self):
+        result = {}
+        if self.arg is not None:
+
+            # expect argument to be in the form of a tuple where the first
+            # element is the file name and the second is the column name
+            result = {self.name: self.arg[0],
+                      self.synth_param_name: self.arg[1]}
+
+        return result
+
 
 # TODO can simple collection be something >1 dimensional (like dict)?
-class CwlSimpleCollectionCase(BaseSimpleCollectionCase, CwlParamCase):
-    def __init__(self, name, spec, arg=None):
-        super().__init__(name, spec, arg)
+class CwlSimpleCollectionCase(CwlParamCase, BaseSimpleCollectionCase):
+    def __init__(self, name, spec, arg=None, type_name=None,
+                 is_optional=None, default=None):
+        super(CwlSimpleCollectionCase, self).__init__(
+            name, spec, arg=arg, type_name=type_name, is_optional=is_optional,
+            default=default)
 
         if SignatureConverter.is_union_anywhere(self.inner_type):
             self.qtype_names = [t.name for t in self.inner_type]
@@ -184,7 +202,7 @@ class CwlSimpleCollectionCase(BaseSimpleCollectionCase, CwlParamCase):
             raise ValueError("CwlSimpleCollectionCase does not handle collections with more than one type")
 
         self._suffix = '[]' + self._suffix
-        self.type_name = self.qtype_names[0].name
+        self.type_name = self.qtype_names[0]
 
 
 class CwlMetadataTabularCase(CwlParamCase):
@@ -247,18 +265,16 @@ class CwlOutputCase(CwlParamCase):
 # cases, where it is called directly
 class CwlFileAndDirCase(CwlPrimitiveUnionCase):
     def __init__(self, name, spec, arg=None, is_optional=None, default=None,
-                 label=None, is_output=False):
+                 is_output=False):
         super().__init__(name, spec, arg, is_optional=is_optional,
                          default=default,
                          cwl_type_names_list=[_cwl_file_type, _cwl_dir_type])
-        self._label = label if label else self.name
         self._is_output = is_output
 
     def inputs(self):
         if not self._is_output:
             input_dict = {
                 self.name: collections.OrderedDict([
-                    ('label', self._label),
                     ('doc', self._make_doc_str()),
                     ('type', self.cwl_type_names)
                 ])

@@ -28,18 +28,26 @@ def make_action_template_id(plugin_id, action_id, replace_underscores=True):
 
 
 class ParamCase:
+    dataflow_prefix = None  # Will be defined in child classes
+    _dataflow_keywords = []  # Will be defined in child classes
+
     def __init__(self, name, spec, arg=None, type_name=None,
                  is_optional=None, default=None):
+        super(ParamCase, self).__init__()
         self.name = name
         self.spec = spec
         self.arg = arg
 
         self.type_name = type_name
         if type_name is None:
-            # TODO the below doesn't handle multiple qiime_types ... need
-            #  something for that case like
-            #  self.type_name = spec.qiime_type.fields[0].name maybe?
-            self.type_name = self.spec.qiime_type.name
+            if self.spec:
+                # TODO the below doesn't handle multiple qiime_types ... need
+                #  something for that case like
+                #  self.type_name = spec.qiime_type.fields[0].name maybe?
+                self.type_name = self.spec.qiime_type.name
+            else:
+                # TODO: put in a warning?
+                pass
 
         self.default = default
         self.is_optional = is_optional
@@ -51,8 +59,28 @@ class ParamCase:
                         self.is_optional = True
                         self.default = self.spec.default
 
+        self.reserved_param_prefix = f"{self.dataflow_prefix}reserved_"
+
+        if self.name in self._dataflow_keywords:
+            # can't use this as a param name bc it is a cwl reserved word
+            self.name = self.reserved_param_prefix + self.name
+
+        self.synth_param_name = None
+
     def inputs(self):
         raise NotImplementedError(self.__class__)
+
+    def args(self):
+        result = {}
+
+        args = self.arg
+        if type(self.arg) == set:
+            args = list(self.arg)
+
+        if args is not None:
+            result[self.name] = args
+
+        return result
 
 
 class NotImplementedCase(ParamCase):
@@ -61,15 +89,18 @@ class NotImplementedCase(ParamCase):
 
 
 class BaseSimpleCollectionCase(ParamCase):
-    def inputs(self):
-        raise NotImplementedError("inputs")
-
-    def __init__(self, name, spec, arg=None):
-        super().__init__(name, spec, arg)
+    def __init__(self, name, spec, arg=None, type_name=None,
+                 is_optional=None, default=None):
+        super(BaseSimpleCollectionCase, self).__init__(
+            name, spec, arg=arg, type_name=type_name, is_optional=is_optional,
+            default=default)
 
         # If we have a simple collection, we only have a single field
         self.inner_type = spec.qiime_type.fields[0]
         self.inner_spec = ParameterSpec(self.inner_type, spec.view_type)
+
+    def inputs(self):
+        raise NotImplementedError("inputs")
 
 
 class SignatureConverter:
