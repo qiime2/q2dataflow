@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------------
-# Copyright (c) 2018-2022, QIIME 2 development team.
+# Copyright (c) 2018-2023, QIIME 2 development team.
 #
 # Distributed under the terms of the Modified BSD License.
 #
@@ -9,8 +9,14 @@ import click
 import json
 
 import q2dataflow.core.description_language.interface as clickin
-from q2dataflow.languages.wdl.templaters.helpers import q2wdl_prefix, \
-    metafile_synth_param_prefix, reserved_param_prefix
+from q2dataflow.languages.wdl.templaters.helpers import \
+    q2wdl_prefix as wdl_prefix, \
+    metafile_synth_param_prefix as wdl_metafile_synth_prefix, \
+    reserved_param_prefix as wdl_reserved_prefix
+from q2dataflow.languages.cwl.templaters.helpers import \
+    q2cwl_prefix as cwl_prefix, \
+    metafile_synth_param_prefix as cwl_metafile_synth_prefix, \
+    reserved_param_prefix as cwl_reserved_prefix
 import q2dataflow.languages.wdl.util as wdl_util
 import q2dataflow.languages.cwl.util as cwl_util
 
@@ -31,7 +37,8 @@ def _make_metadata_param(curr_source, curr_col):
     return new_metadata_val
 
 
-def _reformat_metadata_param(curr_metafile_key, params_dict):
+def _reformat_metadata_param(curr_metafile_key, params_dict,
+                             metafile_synth_param_prefix):
     new_param_val = []
     curr_col = None
 
@@ -66,22 +73,47 @@ def _reformat_metadata_param(curr_metafile_key, params_dict):
     return params_dict
 
 
-def _reformat_q2wdl_params(params_dict):
-    # find and deal with any "special" params inserted by q2wdl
-    q2wdl_special_keys = [x for x in params_dict.keys()
-                          if x.startswith(q2wdl_prefix)]
-    for curr_key in q2wdl_special_keys:
-        if curr_key.startswith(metafile_synth_param_prefix):
-            _reformat_metadata_param(curr_key, params_dict)
-        elif curr_key.startswith(reserved_param_prefix):
-            native_key = curr_key.replace(reserved_param_prefix, "")
+def _reformat_special_params(params_dict, lang_prefix,
+                             metadata_prefix, reserved_prefix):
+    # find and deal with any "special" params inserted by templating
+    lang_special_keys = [x for x in params_dict.keys()
+                         if x.startswith(lang_prefix)]
+    for curr_key in lang_special_keys:
+        if curr_key.startswith(metadata_prefix):
+            _reformat_metadata_param(curr_key, params_dict, metadata_prefix)
+        elif curr_key.startswith(reserved_prefix):
+            native_key = curr_key.replace(reserved_prefix, "")
             params_dict[native_key] = params_dict[curr_key]
             params_dict.pop(curr_key)
         else:
-            raise ValueError(f"Unrecognized q2wdl prefix: '{curr_key}'")
+            raise ValueError(f"Unrecognized special prefix: '{curr_key}'")
 
     return params_dict
 
+
+@click.command("plugin")
+@click.option('--quiet/--no-quiet', default=True)
+@click.argument('plugin', type=str)
+@click.argument('output', type=clickin.OUTPUT_DIR)
+@click.pass_context
+def _template_plugin(ctx, plugin: str, output: str, quiet: bool = False):
+    clickin.plugin(
+        plugin, output, ctx.obj[MODULE_NAME], quiet, settings=ctx.obj)
+
+
+@click.command("builtins")
+@click.option('--quiet/--no-quiet', default=False)
+@click.argument('output', type=clickin.OUTPUT_DIR)
+def _template_builtins(ctx, output: str, quiet: bool = True):
+    clickin.builtins(output, ctx.obj[MODULE_NAME], quiet, settings=ctx.obj)
+
+
+@click.command("all")
+@click.option('--quiet/--no-quiet', default=False)
+@click.argument('output', type=clickin.OUTPUT_DIR)
+@click.pass_context
+def _template_all(ctx, output: str, quiet: bool = True):
+    clickin.all(output, ctx.obj[MODULE_NAME], quiet, settings=ctx.obj)
 
 @click.group()
 def root():
@@ -103,44 +135,25 @@ def wdl(ctx):
     ctx.obj = {MODULE_NAME: "q2dataflow.languages.wdl"}
 
 
-@wdl.group("template", short_help="Generate WDL workflow templates from available actions")
+@wdl.group("template",
+           short_help="Generate WDL workflow templates from available actions")
 @click.pass_context
 def wdl_template(ctx):
     pass
 
 
-@wdl_template.command()
-@click.argument('plugin', type=str)
-@click.argument('output', type=clickin.OUTPUT_DIR)
-@click.pass_context
-def plugin(ctx, plugin, output):
-    clickin.plugin(plugin, output, ctx.obj[MODULE_NAME], True)
-
-
-@wdl_template.command()
-@click.argument('output', type=clickin.OUTPUT_DIR)
-@click.pass_context
-def builtins(ctx, output):
-    clickin.builtins(output, ctx.obj[MODULE_NAME], True)
-
-
-@wdl_template.command()
-@click.argument('output', type=clickin.OUTPUT_DIR)
-@click.pass_context
-def all(ctx, output):
-    clickin.all(output, ctx.obj[MODULE_NAME], True)
-
-
-@wdl.command("run", help="Do not use directly: used internally by q2dataflow wdl")
+@wdl.command("run",
+             help="Do not use directly: used internally by q2dataflow wdl")
 @click.argument('plugin', type=str)
 @click.argument('action', type=str)
-@click.argument('inputs-json', type=click.Path(file_okay=True, dir_okay=False,
-                                          exists=True))
-def run_wdl(plugin, action, inputs_json):
+@click.argument('inputs-json',
+                type=click.Path(file_okay=True, dir_okay=False, exists=True))
+def run_wdl(plugin: str, action: str, inputs_json):
     with open(inputs_json, 'r') as fh:
         config = json.load(fh)
 
-    config = _reformat_q2wdl_params(config)
+    config = _reformat_special_params(
+        config, wdl_prefix, wdl_metafile_synth_prefix, wdl_reserved_prefix)
 
     clickin.run(plugin, action, config, parse_primitives=True)
 
@@ -153,10 +166,37 @@ def cwl(ctx):
     ctx.obj = {MODULE_NAME: "q2dataflow.languages.cwl"}
 
 
-@cwl.group(name="template", short_help="Generate CWL tool templates from available actions")
+@cwl.group(name="template",
+           short_help="Generate CWL tool templates from available actions")
 @click.pass_context
 def cwl_template(ctx):
-    pass
+    ctx.obj["conda"] = True
+
+
+@cwl_template.command("plugin")
+@click.option('--quiet/--no-quiet', default=True)
+@click.argument('plugin', type=str)
+@click.argument('output', type=clickin.OUTPUT_DIR)
+@click.pass_context
+def template_cwl_plugin(ctx, plugin: str, output: str, quiet: bool = False):
+    clickin.plugin(
+        plugin, output, ctx.obj[MODULE_NAME], quiet, settings=ctx.obj)
+
+
+@cwl_template.command()
+@click.option('--quiet/--no-quiet', default=False)
+@click.argument('output', type=clickin.OUTPUT_DIR)
+@click.pass_context
+def builtins(ctx, output: str, quiet: bool = True):
+    clickin.builtins(output, ctx.obj[MODULE_NAME], quiet, settings=ctx.obj)
+
+
+@wdl_template.command()
+@click.option('--quiet/--no-quiet', default=False)
+@click.argument('output', type=clickin.OUTPUT_DIR)
+@click.pass_context
+def all(ctx, output: str, quiet: bool = True):
+    clickin.all(output, ctx.obj[MODULE_NAME], quiet, settings=ctx.obj)
 
 
 @cwl_template.command(short_help="For use within a Conda environment")
@@ -196,6 +236,9 @@ def _temp_inner_conda(ctx, output_dir: str, tools: bool = True,
         clickin.all(output_dir, ctx.obj[MODULE_NAME], quiet, settings=ctx.obj)
 
 
+
+
+
 @cwl_template.command(short_help="For use within a Docker container")
 # TODO: don't have an easy way to leave tools out ... ignoring for now
 @click.option('--tools/--no-tools', default=True, help='Include QIIME 2 tools')
@@ -218,6 +261,35 @@ def docker(ctx, image_id: str, tools: bool = True, availability: str = 'remote',
     clickin.all(output_dir, ctx.obj[MODULE_NAME], quiet, settings=ctx.obj)
 
 
+def _reformat_cwl_path_params(params_dict):
+    def _reformat_cwl_param(param_obj):
+        result = None
+        if isinstance(param_obj, dict):
+            path_val = param_obj.get("path", None)
+            location_val = param_obj.get("location", None)
+            if not path_val and not location_val:
+                raise ValueError("Unable to parse CWL inputs containing "
+                                 "nested dictionary without either 'path' or "
+                                 "'location' key")
+
+            result = path_val if path_val else location_val
+        elif isinstance(param_obj, list):
+            output_list = []
+            for i in param_obj:
+                output_list.append(_reformat_cwl_param(i))
+            result = output_list
+        else:
+            result = param_obj
+
+        return result
+
+    output_dict = {}
+    for k, v in params_dict.items():
+        output_dict[k] = _reformat_cwl_param(v)
+
+    return output_dict
+
+
 @cwl.command(name="run", help="Do not use directly: used internally by q2dataflow cwl")
 @click.argument('plugin', type=str)
 @click.argument('action', type=str)
@@ -225,16 +297,25 @@ def docker(ctx, image_id: str, tools: bool = True, availability: str = 'remote',
                 type=click.Path(file_okay=True, dir_okay=False, exists=True))
 def run_cwl(plugin, action, inputs_json):
     with open(inputs_json, 'r') as fh:
-        config = json.load(fh)['inputs']
+        raw_inputs_json = json.load(fh)
+        config = raw_inputs_json['inputs']
+
+    config = _reformat_cwl_path_params(config)
+    config = _reformat_special_params(
+        config, cwl_prefix, cwl_metafile_synth_prefix, cwl_reserved_prefix)
 
     clickin.run(plugin, action, config, parse_primitives=True)
 
 
 def test_template_plugin():
     cli_runner = CliRunner()
-    result = cli_runner.invoke(cwl, ['template', 'conda', '--plugin', 'composition', '~/Temp/q2cwl'])
+    result = cli_runner.invoke(cwl, ['run', 'mystery_stew', 'artifact_params_1', '/Users/abirmingham/Desktop/tmp_artifact_1/inputs.json'])
     print(result)
 
+
+wdl_template.add_command(_template_plugin)
+wdl_template.add_command(_template_builtins)
+wdl_template.add_command(_template_all)
 
 if __name__ == '__main__':
     root()
