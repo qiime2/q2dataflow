@@ -14,8 +14,13 @@ class CwlTestUsage(DataflowTestUsage):
     dataflow_module_name = "q2dataflow.languages.cwl"
     params_fname = "template_params.yaml"
 
+    def __init__(self, settings):
+        super().__init__(settings=settings)
+        self._working_dir = settings['working_dir']
+
     def get_run_command(self):
-        return f"cwltool --preserve-entire-environment " \
+        return f"cwltool --debug --preserve-entire-environment " \
+               f"--outdir {self._working_dir} " \
                f"{self._template_fname} " \
                f"{self.params_fname}"
 
