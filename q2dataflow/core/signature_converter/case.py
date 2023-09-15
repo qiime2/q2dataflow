@@ -27,6 +27,21 @@ def make_action_template_id(plugin_id, action_id, replace_underscores=True):
                      munged_action_id])
 
 
+def get_multiple_qtype_names(spec_qiime_type):
+    qtypes_list = []
+    for curr_included_type in spec_qiime_type:
+        if curr_included_type.name == "":
+            # NB: this happens in cases like when the current included type is
+            # *itself* a combination, like a primitive union, e.g.
+            # (Int % Range(5, 10) | Range(15, 20))
+            raise NotImplementedError(
+                f"Unable to map qiime type with members "
+                f"{curr_included_type.members} but without name to type "
+                f"in template language")
+        qtypes_list.append(curr_included_type.name)
+    return qtypes_list
+
+
 class ParamCase:
     dataflow_prefix = None  # Will be defined in child classes
     _dataflow_keywords = []  # Will be defined in child classes
