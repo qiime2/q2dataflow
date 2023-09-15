@@ -1,8 +1,9 @@
-import collections
 from q2dataflow.core.signature_converter.case import SignatureConverter, \
-    ParamCase, BaseSimpleCollectionCase, QIIME_STR_TYPE, QIIME_BOOL_TYPE
+    ParamCase, BaseSimpleCollectionCase, QIIME_STR_TYPE, QIIME_BOOL_TYPE, \
+    get_multiple_qtype_names
 
 q2cwl_prefix = "q2cwl_"
+metafile_synth_param_prefix = f"{q2cwl_prefix}metafile_"
 reserved_param_prefix = f"{q2cwl_prefix}reserved_"
 
 _cwl_file_type = "File"
@@ -16,13 +17,58 @@ _internal_to_cwl_type = {
     _cwl_file_type: _cwl_file_type
 }
 
-# TODO: are there any cwl keywords?
-_cwl_keywords_v1 = set()
+# Apparently there are currently no reserved words in CWL and no plans for any
+# (see https://github.com/common-workflow-language/common-workflow-language/issues/759 )
+# but I think it does no harm to leave this here as room to grow
+_cwl_keywords = set()
+
+
+# Note that this method does NOT handle files that come from a remote URL,
+# which would use the "location" key instead of the "path" key.  Currently only
+# the mystery stew testing needs to generate argument dictionaries, and it
+# is all local files, so this is fine for now.
+def _make_path_arg_value(fp_or_dir, is_file):
+    class_name = _cwl_file_type if is_file else _cwl_dir_type
+    if type(fp_or_dir) is not str:
+        result = []
+        for curr_fp_or_dir in fp_or_dir:
+            result.append({"class": class_name,
+                           "path": curr_fp_or_dir})
+    else:
+        result = {"class": class_name,
+                  "path": fp_or_dir}
+    return result
+
+
+def _make_file_or_path_arg_dict(name, arg, is_file):
+    result = {}
+    if arg is not None:
+        path_arg_value = _make_path_arg_value(arg, is_file)
+        result = {name: path_arg_value}
+    return result
+
+
+def _make_cwl_types_list(qtype_name_or_names):
+    type_list = []
+
+    if type(qtype_name_or_names) is str:
+        qtype_name_or_names = [qtype_name_or_names]
+
+    for curr_qtype_name in qtype_name_or_names:
+        if curr_qtype_name in _internal_to_cwl_type:
+            curr_cwl_type = _internal_to_cwl_type[curr_qtype_name]
+        else:
+            raise ValueError("Unknown qiime type: %r" % curr_qtype_name)
+
+        if curr_cwl_type not in type_list:
+            type_list.append(curr_cwl_type)
+
+    return type_list
 
 
 class CwlParamCase(ParamCase):
     dataflow_prefix = q2cwl_prefix
-    _dataflow_keywords = _cwl_keywords_v1
+    _dataflow_keywords = _cwl_keywords
 
     def __init__(self, name, spec, arg=None, type_name=None,
                  is_optional=None, default=None):
@@ -40,9 +86,18 @@ class CwlParamCase(ParamCase):
             result = self.spec.description
         return result
 
-    def _make_param_dict(self, type_or_types):
+    def _make_param_dict_for_type_or_types(self, type_or_types):
+        cwl_type = type_or_types
+        # NB: here we are considering a list (array) of possible CWL types.
+        # This is not to be confused with an array of values of a single type;
+        # that is handled by the _suffix attribute.
+        if type(type_or_types) is not str:
+            cwl_type = [x + self._suffix for x in type_or_types]
+        else:
+            cwl_type = cwl_type + self._suffix
+
         name_dict = {
-            'type': type_or_types,
+            'type': cwl_type,
             'doc': self._make_doc_str(),
         }
         if self.is_optional and self.default is not None:
@@ -55,12 +110,8 @@ class CwlParamCase(ParamCase):
         return param_dict
 
     def inputs(self):
-        if self.type_name in _internal_to_cwl_type:
-            cwl_type = _internal_to_cwl_type[self.type_name] + self._suffix
-            param_dict = self._make_param_dict(cwl_type)
-        else:
-            raise Exception("Unknown type: %r" % self.type_name)
-
+        cwl_types_list = _make_cwl_types_list(self.type_name)
+        param_dict = self._make_param_dict_for_type_or_types(cwl_types_list)
         return param_dict
 
     def outputs(self):
@@ -68,11 +119,6 @@ class CwlParamCase(ParamCase):
 
 
 class CwlInputCase(CwlParamCase):
-    # TODO: the multiple info passed here comes from
-    #  multiple=style.style is not None
-    #  but historically q2cwl instead used
-    #  is_array=qiime_type.name in ('List', 'Set')
-    #  Can I used the former instead of the latter here?
     def __init__(self, name, spec, arg=None, type_name=_cwl_file_type,
                  is_optional=None, default=None, multiple=False):
         super().__init__(name, spec, arg, type_name, is_optional, default)
@@ -80,20 +126,17 @@ class CwlInputCase(CwlParamCase):
 
     def inputs(self):
         if self.multiple:
-            self._suffix = "[]"
+            self._suffix = "[]" + self._suffix
         if self.spec and self.spec.has_default() and self.spec.default is not None:
             raise NotImplementedError("inputs with non-None default values")
-        cwl_type = _cwl_file_type + self._suffix
 
-        input_dict = {
-            self.name: collections.OrderedDict([
-                ('label', self.name),
-                ('doc', self._make_doc_str()),
-                ('type', cwl_type)
-            ])
-        }
-
+        input_dict = self._make_param_dict_for_type_or_types(_cwl_file_type)
         return input_dict
+
+    def args(self):
+        # TODO: how do I figure out if it is a file or a dir?
+        is_file = True
+        return _make_file_or_path_arg_dict(self.name, self.arg, is_file)
 
 
 class CwlStrCase(CwlParamCase):
@@ -115,33 +158,14 @@ class CwlPrimitiveUnionCase(CwlParamCase):
         # If passing in the types directly, use cwl types instead of qiime ones
         self.cwl_type_names = cwl_type_names_list
         if not self.cwl_type_names:
-            # TODO: q2wdl/q2galaxy get the qiime types the way shown below but
-            #  q2wdl does
-            #        for member in qiime_type.to_ast()['members']:
-            #           union_member_name = member['name']
-            #  Can we use the way below instead?
-            self.qtype_names = [t.name for t in self.spec.qiime_type]
-        # NB: ignoring nested primitive unions, like
-        # Int % Range(5, 10) | Range(15, 20)
-        # since both should have to match the outside type (Int, here) ...
-        # TODO Evan, right?
+            self.qtype_names = get_multiple_qtype_names(self.spec.qiime_type)
 
     def inputs(self):
         type_list = self.cwl_type_names
         if not type_list:
-            type_list = []
-            for union_member_name in self.qtype_names:
-                curr_cwl_type = _internal_to_cwl_type[union_member_name]
-                if curr_cwl_type not in type_list:
-                    type_list.append(curr_cwl_type)
+            type_list = _make_cwl_types_list(self.qtype_names)
 
-        # TODO: import/export inputs and outputs, which explicitly specify
-        #  their file types, don't have default values.  I see no reason why
-        #  they cannot or should not.
-        #  This implementation WILL NOT match the current cwl implementation
-        #  specifically for the import/export inputs and outputs.
-
-        param_dict = self._make_param_dict(type_list)
+        param_dict = self._make_param_dict_for_type_or_types(type_list)
         return param_dict
 
 
@@ -151,9 +175,9 @@ class CwlColumnTabularCase(CwlParamCase):
             raise ValueError("Unexpected type of input parameter 'arg'")
         super().__init__(name, spec, arg)
 
-        # Note: here the synth param holds the column name
-        # and the "regular" param name holds the file name
-        self.synth_param_name = self.name + '_column'
+        # Note: here the synth param holds the file name
+        # and the "regular" param name holds the column name
+        self.synth_param_name = f"{metafile_synth_param_prefix}{self.name}"
 
     def inputs(self):
         if self.default is not None:
@@ -161,13 +185,13 @@ class CwlColumnTabularCase(CwlParamCase):
                 "metadata columns with non-None default values")
 
         output_dict = {
-            self.name: {
-                'type': _cwl_file_type,
+            self.synth_param_name: {
+                'type': _cwl_file_type + self._suffix,
                 'doc': self._make_doc_str(),
             },
-            self.synth_param_name: {
-                'type': 'string',
-                'doc': 'Column name to use from %r' % self.name,
+            self.name: {
+                'type': 'string' + self._suffix,
+                'doc': 'Column name to use from %r file' % self.name,
             }
         }
 
@@ -176,16 +200,15 @@ class CwlColumnTabularCase(CwlParamCase):
     def args(self):
         result = {}
         if self.arg is not None:
-
             # expect argument to be in the form of a tuple where the first
             # element is the file name and the second is the column name
-            result = {self.name: self.arg[0],
-                      self.synth_param_name: self.arg[1]}
-
+            file_arg_dict = _make_path_arg_value(self.arg[0], True)
+            result = {self.synth_param_name: file_arg_dict,
+                      self.name: self.arg[1]}
         return result
 
 
-# TODO can simple collection be something >1 dimensional (like dict)?
+# TODO Evan, can simple collection be something >1 dimensional (like dict)?
 class CwlSimpleCollectionCase(CwlParamCase, BaseSimpleCollectionCase):
     def __init__(self, name, spec, arg=None, type_name=None,
                  is_optional=None, default=None):
@@ -194,15 +217,17 @@ class CwlSimpleCollectionCase(CwlParamCase, BaseSimpleCollectionCase):
             default=default)
 
         if SignatureConverter.is_union_anywhere(self.inner_type):
-            self.qtype_names = [t.name for t in self.inner_type]
+            self.qtype_names = get_multiple_qtype_names(self.inner_type)
+            if len(self.qtype_names) > 1:
+                raise NotImplementedError("CWL reference implementation "
+                                          "does not support unions containing "
+                                          "multiple array types")
+            self.type_name = self.qtype_names
         else:
             self.qtype_names = [self.inner_spec.qiime_type.name]
-
-        if len(self.qtype_names) > 1:
-            raise ValueError("CwlSimpleCollectionCase does not handle collections with more than one type")
+            self.type_name = self.inner_type.name
 
         self._suffix = '[]' + self._suffix
-        self.type_name = self.qtype_names[0]
 
 
 class CwlMetadataTabularCase(CwlParamCase):
@@ -211,16 +236,16 @@ class CwlMetadataTabularCase(CwlParamCase):
             arg = arg.split()  # default split is on whitespace
         super().__init__(name, spec, arg)
 
-    def inputs(self):
-        param_dict = {
-            self.name: {
-                'type': [_cwl_file_type + self._suffix,
-                         _cwl_file_type + '[]' + self._suffix],
-                'doc': self._make_doc_str(),
-            }
-        }
+        mod_param_name = self.name.replace(reserved_param_prefix, "")
+        self.name = f"{metafile_synth_param_prefix}{mod_param_name}"
 
+    def inputs(self):
+        param_dict = self._make_param_dict_for_type_or_types(
+            [_cwl_file_type, _cwl_file_type + '[]'])
         return param_dict
+
+    def args(self):
+        return _make_file_or_path_arg_dict(self.name, self.arg, True)
 
 
 class CwlOutputCase(CwlParamCase):
@@ -228,7 +253,6 @@ class CwlOutputCase(CwlParamCase):
                  is_optional=None, default=None):
         super().__init__(name, spec, arg, type_name, is_optional, default)
 
-    # TODO: ask Evan: are qiime2 plugin output names *always* captured via
     # TODO: Do cwl param names need to be unique across the whole template or
     #  only within their parent?  This makes an output with the same name as
     #  the input, which may or may not be kosher ...
@@ -242,18 +266,10 @@ class CwlOutputCase(CwlParamCase):
     #  strings specifies a directory name).
     def outputs(self):
         out_binding_str = f"$(inputs.{self.name})"
-        if self.spec:
-            if self.spec.qiime_type.name == 'Visualization':
-                ext = '.qzv'
-            else:
-                ext = '.qza'
-            out_binding_str = self.name + ext
-
         output_dict = {
-            self.name: {
+            (self.name + "_file"): {
                 'type': _cwl_file_type,
                 'doc': self._make_doc_str(),
-                'label': self.name,
                 'outputBinding': {'glob': out_binding_str}
             }
         }
@@ -273,12 +289,8 @@ class CwlFileAndDirCase(CwlPrimitiveUnionCase):
 
     def inputs(self):
         if not self._is_output:
-            input_dict = {
-                self.name: collections.OrderedDict([
-                    ('doc', self._make_doc_str()),
-                    ('type', self.cwl_type_names)
-                ])
-            }
+            input_dict = self._make_param_dict_for_type_or_types(
+                self.cwl_type_names)
         else:
             temp_str_case = CwlStrCase(self.name, self.spec, arg=self.arg,
                                        is_optional=self.is_optional,
@@ -294,12 +306,16 @@ class CwlFileAndDirCase(CwlPrimitiveUnionCase):
                 self.name: {
                     'type': self.cwl_type_names,
                     'doc': self._make_doc_str(),
-                    'label': self.name,
                     'outputBinding': {'glob': '$(inputs.output_name)'}
                 }
             }
 
         return output_dict
+
+    def args(self):
+        # TODO: how do I figure out if it is a file or a dir?
+        is_file = True
+        return _make_file_or_path_arg_dict(self.name, self.arg, is_file)
 
 
 class CwlSignatureConverter(SignatureConverter):
