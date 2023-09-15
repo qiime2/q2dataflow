@@ -27,7 +27,7 @@ class CwlActionTemplate(DataflowActionTemplate):
             self._template_dict['doc'] = doc
         # Note: cwl speaks yaml, but this is setting up an eventual argument to
         # q2dataflow.__main__.run, which take a *json* input file.
-        self._template_dict['arguments'] = [
+        self._template_dict['arguments'] = ['cwl', 'run',
             plugin_id.replace('-', '_'), action_id, 'inputs.json']
 
     def _root_structure(self):
@@ -39,7 +39,7 @@ class CwlActionTemplate(DataflowActionTemplate):
         template_dict['label'] = None
         template_dict['doc'] = None
         template_dict['inputs'] = collections.OrderedDict()
-        template_dict['baseCommand'] = 'q2cwl-run'
+        template_dict['baseCommand'] = 'q2dataflow'
         template_dict['arguments'] = None
         template_dict['outputs'] = collections.OrderedDict()
 
@@ -111,7 +111,7 @@ def make_action_template(plugin_id, action, settings, arguments=None):
 
 
 def make_action_template_str(plugin, action, settings):
-    cwl_template = make_action_template(plugin, action, settings)
+    cwl_template = make_action_template(plugin.id, action, settings)
     return cwl_template.make_template_str()
 
 
