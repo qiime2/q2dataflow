@@ -7,7 +7,6 @@ def make_builtin_import_template_str(template_id, settings):
     import_template = CwlActionTemplate(
         "tools", "import", 'Import data into a QIIME 2 Artifact',
         None, template_id, settings)
-    # TODO: q2cwl makes label = "type" not "input_type"... why?
     import_template.add_param(CwlStrCase("input_type", None, is_optional=False))
     import_template.add_param(CwlStrCase(
         "input_format", None, is_optional=True, default=None))

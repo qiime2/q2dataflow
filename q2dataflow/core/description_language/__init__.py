@@ -8,7 +8,6 @@
 
 import os
 import importlib
-
 import qiime2.sdk as _sdk
 import q2dataflow.core.description_language.environment as _environment
 
@@ -56,8 +55,6 @@ def _template_action_iter(plugin, action, directory, templater_lib, settings):
         action_template_str = templater_lib.make_action_template_str(
             plugin, action, settings=settings)
     except Exception as ex:  # noqa E722
-        tb = traceback.format_exc()
-        print(tb)
         yield {'status': 'error', 'type': 'file',
                'path': plugin.id + "_" + action.id}
 
