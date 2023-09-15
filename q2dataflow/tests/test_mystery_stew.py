@@ -45,31 +45,48 @@ def _test_mystery_stew(action, example, test_usage_factory, settings=None):
         time.sleep(1)
 
     example_f = action.examples[example]
-    test_usage = test_usage_factory(settings=settings)
-    example_f(test_usage)
-    rendered = '\n'.join(test_usage.recorder)
 
-    with tempfile.TemporaryDirectory() as tmpdir:
+    # TODO: put back test usage after testing
+    #with tempfile.TemporaryDirectory() as tmpdir:
+    from pathlib import Path
+    tmpdir = f"/Users/abirmingham/Desktop/debugging/{action.id}_{example}"
+    Path(tmpdir).mkdir(exist_ok=True)
+
+    settings = {} if settings is None else settings
+    settings['working_dir'] = tmpdir
+    test_usage = test_usage_factory(settings=settings)
+
+    try:
+        example_f(test_usage)
+
+        rendered = '\n'.join(test_usage.recorder)
         for ref, data in test_usage.get_example_data():
             data.save(os.path.join(tmpdir, ref))
 
-        try:
-            test_usage.save_run_files(tmpdir)
-        except NotImplementedError:
-            # skip, not fail, tests for known not-implemented functionality
-            pytest.skip(f"No implementation supporting {action.id} {example}")
-            return
+        test_usage.save_run_files(tmpdir)
+    except NotImplementedError:
+        # skip, not fail, tests for known not-implemented functionality
+        pytest.skip(f"No implementation supporting {action.id} {example}")
+        return
 
-        subprocess.run([rendered],
-                       shell=True,
-                       check=True,
-                       cwd=tmpdir,
-                       env={**os.environ})
+    # TODO remove debug save
+    cmds_fp = f"/Users/abirmingham/Desktop/debugging/{action.id}_{example}/{action.id}_{example}.cmds"
+    with open(cmds_fp, "w") as r:
+        r.write(rendered)
+
+    subprocess.run([rendered],
+                   shell=True,
+                   check=True,
+                   cwd=tmpdir,
+                   env={**os.environ})
+
+    # TODO remove debug print
+    print("done w process")
 
 
-# @pytest.mark.parametrize('action,example', get_tests(), ids=lambda x: _labeler(x, "wdl"))
-# def test_wdl_mystery_stew(action, example):
-#     _test_mystery_stew(action, example, WdlTestUsage)
+@pytest.mark.parametrize('action,example', get_tests(), ids=lambda x: _labeler(x, "wdl"))
+def test_wdl_mystery_stew(action, example):
+    _test_mystery_stew(action, example, WdlTestUsage)
 
 
 @pytest.mark.parametrize('action,example', get_tests(), ids=lambda x: _labeler(x, "cwl"))
