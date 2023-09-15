@@ -1,5 +1,6 @@
 from q2dataflow.core.signature_converter.case import SignatureConverter, \
-    ParamCase, BaseSimpleCollectionCase, QIIME_STR_TYPE, QIIME_BOOL_TYPE
+    ParamCase, BaseSimpleCollectionCase, QIIME_STR_TYPE, QIIME_BOOL_TYPE, \
+    get_multiple_qtype_names
 
 q2wdl_prefix = "q2wdl_"
 metafile_synth_param_prefix = f"{q2wdl_prefix}metafile_"
@@ -184,11 +185,7 @@ class WdlPrimitiveUnionCase(WdlParamCase):
     def __init__(self, name, spec, arg=None):
         super().__init__(name, spec, arg)
 
-        self.qtype_names = [t.name for t in self.spec.qiime_type]
-        # NB: ignoring nested primitive unions, like
-        # Int % Range(5, 10) | Range(15, 20)
-        # since both should have to match the outside type (Int, here) ...
-        # TODO Evan, right?
+        self.qtype_names = get_multiple_qtype_names(self.spec.qiime_type)
 
     def inputs(self, include_defaults=False):
         if len(self.qtype_names) > 1:
@@ -254,8 +251,8 @@ class WdlColumnTabularCase(WdlParamCase):
         if self.arg is not None:
             # expect argument to be in the form of a tuple where the first
             # element is the file name and the second is the column name
-            result = {self.name: self.arg[1],
-                      self.synth_param_name: self.arg[0]}
+            result = {self.synth_param_name: self.arg[0],
+                      self.name: self.arg[1]}
 
         return result
 
