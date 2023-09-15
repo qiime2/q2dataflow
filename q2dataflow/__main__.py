@@ -91,8 +91,37 @@ def _reformat_special_params(params_dict, lang_prefix,
     return params_dict
 
 
+def _reformat_cwl_path_params(params_dict):
+    def _reformat_cwl_param(param_obj):
+        result = None
+        if isinstance(param_obj, dict):
+            path_val = param_obj.get("path", None)
+            location_val = param_obj.get("location", None)
+            if not path_val and not location_val:
+                raise ValueError("Unable to parse CWL inputs containing "
+                                 "nested dictionary without either 'path' or "
+                                 "'location' key")
+
+            result = path_val if path_val else location_val
+        elif isinstance(param_obj, list):
+            output_list = []
+            for i in param_obj:
+                output_list.append(_reformat_cwl_param(i))
+            result = output_list
+        else:
+            result = param_obj
+
+        return result
+
+    output_dict = {}
+    for k, v in params_dict.items():
+        output_dict[k] = _reformat_cwl_param(v)
+
+    return output_dict
+
+
 @click.command("plugin")
-@click.option('--quiet/--no-quiet', default=True)
+@click.option('--quiet/--no-quiet', default=False)
 @click.argument('plugin', type=str)
 @click.argument('output', type=clickin.OUTPUT_DIR)
 @click.pass_context
@@ -104,7 +133,8 @@ def _template_plugin(ctx, plugin: str, output: str, quiet: bool = False):
 @click.command("builtins")
 @click.option('--quiet/--no-quiet', default=False)
 @click.argument('output', type=clickin.OUTPUT_DIR)
-def _template_builtins(ctx, output: str, quiet: bool = True):
+@click.pass_context
+def _template_builtins(ctx, output: str, quiet: bool = False):
     clickin.builtins(output, ctx.obj[MODULE_NAME], quiet, settings=ctx.obj)
 
 
@@ -112,8 +142,9 @@ def _template_builtins(ctx, output: str, quiet: bool = True):
 @click.option('--quiet/--no-quiet', default=False)
 @click.argument('output', type=clickin.OUTPUT_DIR)
 @click.pass_context
-def _template_all(ctx, output: str, quiet: bool = True):
+def _template_all(ctx, output: str, quiet: bool = False):
     clickin.all(output, ctx.obj[MODULE_NAME], quiet, settings=ctx.obj)
+
 
 @click.group()
 def root():
@@ -173,124 +204,8 @@ def cwl_template(ctx):
     ctx.obj["conda"] = True
 
 
-@cwl_template.command("plugin")
-@click.option('--quiet/--no-quiet', default=True)
-@click.argument('plugin', type=str)
-@click.argument('output', type=clickin.OUTPUT_DIR)
-@click.pass_context
-def template_cwl_plugin(ctx, plugin: str, output: str, quiet: bool = False):
-    clickin.plugin(
-        plugin, output, ctx.obj[MODULE_NAME], quiet, settings=ctx.obj)
-
-
-@cwl_template.command()
-@click.option('--quiet/--no-quiet', default=False)
-@click.argument('output', type=clickin.OUTPUT_DIR)
-@click.pass_context
-def builtins(ctx, output: str, quiet: bool = True):
-    clickin.builtins(output, ctx.obj[MODULE_NAME], quiet, settings=ctx.obj)
-
-
-@wdl_template.command()
-@click.option('--quiet/--no-quiet', default=False)
-@click.argument('output', type=clickin.OUTPUT_DIR)
-@click.pass_context
-def all(ctx, output: str, quiet: bool = True):
-    clickin.all(output, ctx.obj[MODULE_NAME], quiet, settings=ctx.obj)
-
-
-@cwl_template.command(short_help="For use within a Conda environment")
-@click.option('--plugin', required=False, help='Template only a single plugin')
-@click.option('--tools/--no-tools', default=True, help='Include QIIME 2 tools')
-@click.option('--quiet/--no-quiet', default=False)
-@click.argument('output-dir', type=click.Path(file_okay=False, writable=True))
-@click.pass_context
-def conda(ctx, output_dir: str, tools: bool = True, plugin: str = None,
-          quiet: bool = False):
-
-    ctx.obj["conda"] = True
-
-    if plugin:
-        clickin.plugin(plugin, output_dir, ctx.obj[MODULE_NAME],
-                       quiet, settings=ctx.obj)
-        if tools:
-            clickin.builtins(output_dir, ctx.obj[MODULE_NAME],
-                             quiet, settings=ctx.obj)
-    else:
-        # TODO: no good way NOT to do tools when doing all ...
-        clickin.all(output_dir, ctx.obj[MODULE_NAME], quiet, settings=ctx.obj)
-
-
-def _temp_inner_conda(ctx, output_dir: str, tools: bool = True,
-                      plugin: str = None, quiet: bool = False):
-
-    ctx.obj["conda"] = True
-
-    if plugin:
-        clickin.plugin(plugin, output_dir, ctx.obj[MODULE_NAME],
-                       quiet, settings=ctx.obj)
-        if tools:
-            clickin.builtins(output_dir, ctx.obj[MODULE_NAME],
-                             quiet, settings=ctx.obj)
-    else:
-        clickin.all(output_dir, ctx.obj[MODULE_NAME], quiet, settings=ctx.obj)
-
-
-
-
-
-@cwl_template.command(short_help="For use within a Docker container")
-# TODO: don't have an easy way to leave tools out ... ignoring for now
-@click.option('--tools/--no-tools', default=True, help='Include QIIME 2 tools')
-@click.option('--remote', 'availability', flag_value='remote', default=True,
-              help='Image is available on hub.docker.com (default)')
-@click.option('--local', 'availability', flag_value='local',
-              help='Image is only available on current host.')
-@click.option('--quiet/--no-quiet', default=False)
-@click.argument('image-id')
-@click.pass_context
-def docker(ctx, image_id: str, tools: bool = True, availability: str = 'remote',
-           quiet: bool = False):
-
-    output_dir = '/tmp/cwl-tools/'
-    ctx.obj["docker"] = {
-        "image_id": image_id,
-        "availability": availability
-    }
-
-    clickin.all(output_dir, ctx.obj[MODULE_NAME], quiet, settings=ctx.obj)
-
-
-def _reformat_cwl_path_params(params_dict):
-    def _reformat_cwl_param(param_obj):
-        result = None
-        if isinstance(param_obj, dict):
-            path_val = param_obj.get("path", None)
-            location_val = param_obj.get("location", None)
-            if not path_val and not location_val:
-                raise ValueError("Unable to parse CWL inputs containing "
-                                 "nested dictionary without either 'path' or "
-                                 "'location' key")
-
-            result = path_val if path_val else location_val
-        elif isinstance(param_obj, list):
-            output_list = []
-            for i in param_obj:
-                output_list.append(_reformat_cwl_param(i))
-            result = output_list
-        else:
-            result = param_obj
-
-        return result
-
-    output_dict = {}
-    for k, v in params_dict.items():
-        output_dict[k] = _reformat_cwl_param(v)
-
-    return output_dict
-
-
-@cwl.command(name="run", help="Do not use directly: used internally by q2dataflow cwl")
+@cwl.command(name="run",
+             help="Do not use directly: used internally by q2dataflow cwl")
 @click.argument('plugin', type=str)
 @click.argument('action', type=str)
 @click.argument('inputs-json',
@@ -307,15 +222,12 @@ def run_cwl(plugin, action, inputs_json):
     clickin.run(plugin, action, config, parse_primitives=True)
 
 
-def test_template_plugin():
-    cli_runner = CliRunner()
-    result = cli_runner.invoke(cwl, ['run', 'mystery_stew', 'artifact_params_1', '/Users/abirmingham/Desktop/tmp_artifact_1/inputs.json'])
-    print(result)
-
-
 wdl_template.add_command(_template_plugin)
 wdl_template.add_command(_template_builtins)
 wdl_template.add_command(_template_all)
+cwl_template.add_command(_template_plugin)
+cwl_template.add_command(_template_builtins)
+cwl_template.add_command(_template_all)
 
 if __name__ == '__main__':
     root()
