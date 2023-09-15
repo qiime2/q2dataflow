@@ -22,7 +22,6 @@ def _echo_status(status, quiet: bool = False):
     if status is None:
         return
 
-    # TODO: q2cwl echo_status is a lot more verbose ... do I need to reproduce?
     line = json.dumps(status)
     if status['status'] == 'error':
         click.secho(line, fg='red', err=True)

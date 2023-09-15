@@ -34,7 +34,6 @@ class DataflowTestUsage(CLIUsage):
             action.plugin_id, action.action_id) + self.get_extension()
 
         self.recorder.append("export MYSTERY_STEW=1")
-        self.recorder.append("echo $PATH")
         self.recorder.append(self.get_run_command())
 
         self.recorder.append(r"find . -iname '*.qza' -exec cp \{\} ./ \;")
