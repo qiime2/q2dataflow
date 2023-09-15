@@ -96,7 +96,7 @@ task {self._template_id} {{
     }}
 
     command {{
-        q2dataflow q2wdl run {self._plugin_id} {self._action_id} ~{{write_json(task_params)}}
+        q2dataflow wdl run {self._plugin_id} {self._action_id} ~{{write_json(task_params)}}
     }}
 
     {self._get_outputs()}
