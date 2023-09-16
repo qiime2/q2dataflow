@@ -71,11 +71,13 @@ def _test_mystery_stew(action, example, test_usage_factory, settings=None):
                        env={**os.environ})
 
 
-@pytest.mark.parametrize('action,example', get_tests(), ids=lambda x: _labeler(x, "wdl"))
+@pytest.mark.parametrize('action,example', get_tests(),
+                         ids=lambda x: _labeler(x, "wdl"))
 def test_wdl_mystery_stew(action, example):
     _test_mystery_stew(action, example, WdlTestUsage)
 
 
-@pytest.mark.parametrize('action,example', get_tests(), ids=lambda x: _labeler(x, "cwl"))
+@pytest.mark.parametrize('action,example', get_tests(),
+                         ids=lambda x: _labeler(x, "cwl"))
 def test_cwl_mystery_stew(action, example):
     _test_mystery_stew(action, example, CwlTestUsage, settings={"conda": True})
