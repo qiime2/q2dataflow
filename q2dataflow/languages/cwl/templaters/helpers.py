@@ -253,10 +253,6 @@ class CwlOutputCase(CwlParamCase):
                  is_optional=None, default=None):
         super().__init__(name, spec, arg, type_name, is_optional, default)
 
-    # TODO: Do cwl param names need to be unique across the whole template or
-    #  only within their parent?  This makes an output with the same name as
-    #  the input, which may or may not be kosher ...
-
     # TODO: this doesn't provide output objects for any outputs to directories.
     #  CWL does support output directory objects (see cwl export tool, which
     #  has an output with type ['File', 'Directory']) but I don't know of any
