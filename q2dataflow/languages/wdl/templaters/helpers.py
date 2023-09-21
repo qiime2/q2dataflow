@@ -1,6 +1,6 @@
 from q2dataflow.core.signature_converter.case import SignatureConverter, \
     ParamCase, BaseSimpleCollectionCase, QIIME_STR_TYPE, QIIME_BOOL_TYPE, \
-    get_multiple_qtype_names
+    get_multiple_qtype_names, get_possibly_str_collection_args
 
 q2wdl_prefix = "q2wdl_"
 metafile_synth_param_prefix = f"{q2wdl_prefix}metafile_"
@@ -284,16 +284,7 @@ class WdlSimpleCollectionCase(BaseSimpleCollectionCase, WdlParamCase):
         if type(self.arg) == set:
             args = list(self.arg)
 
-        str_args = []
-        if len(self.qtype_names) > 1:
-            if args is not None:
-                for curr_arg in args:
-                    # again, if there are multiple types, q2dataflow wdl treats
-                    # the param's variable as a string, so all arguments to
-                    # that variable need to be converted to strings
-                    str_args.append(str(curr_arg))
-        if len(str_args) > 0:
-            args = str_args
+        args = get_possibly_str_collection_args(args, self.qtype_names)
 
         if args is not None:
             result[self.name] = args

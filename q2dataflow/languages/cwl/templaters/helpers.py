@@ -1,6 +1,6 @@
 from q2dataflow.core.signature_converter.case import SignatureConverter, \
     ParamCase, BaseSimpleCollectionCase, QIIME_STR_TYPE, QIIME_BOOL_TYPE, \
-    get_multiple_qtype_names
+    get_multiple_qtype_names, get_possibly_str_collection_args
 
 q2cwl_prefix = "q2cwl_"
 metafile_synth_param_prefix = f"{q2cwl_prefix}metafile_"
@@ -63,6 +63,10 @@ def _make_cwl_types_list(qtype_name_or_names):
         if curr_cwl_type not in type_list:
             type_list.append(curr_cwl_type)
 
+    if len(type_list) == 0:
+        raise ValueError("Unable to map qiime type(s) %r to type in "
+                         "template language" % qtype_name_or_names)
+
     return type_list
 
 
@@ -87,14 +91,18 @@ class CwlParamCase(ParamCase):
         return result
 
     def _make_param_dict_for_type_or_types(self, type_or_types):
-        cwl_type = type_or_types
+        cwl_type = None
         # NB: here we are considering a list (array) of possible CWL types.
         # This is not to be confused with an array of values of a single type;
         # that is handled by the _suffix attribute.
         if type(type_or_types) is not str:
-            cwl_type = [x + self._suffix for x in type_or_types]
-        else:
-            cwl_type = cwl_type + self._suffix
+            if len(type_or_types) > 1:
+                cwl_type = [x + self._suffix for x in type_or_types]
+            else:
+                type_or_types = type_or_types[0]
+
+        if cwl_type is None:
+            cwl_type = type_or_types + self._suffix
 
         name_dict = {
             'type': cwl_type,
@@ -134,7 +142,8 @@ class CwlInputCase(CwlParamCase):
         return input_dict
 
     def args(self):
-        # TODO: how do I figure out if it is a file or a dir?
+        # TODO: when more explicit handling for directory inputs is phased in,
+        #  we can add logic here to determine if the input is a file or a dir
         is_file = True
         return _make_file_or_path_arg_dict(self.name, self.arg, is_file)
 
@@ -219,15 +228,17 @@ class CwlSimpleCollectionCase(CwlParamCase, BaseSimpleCollectionCase):
         if SignatureConverter.is_union_anywhere(self.inner_type):
             self.qtype_names = get_multiple_qtype_names(self.inner_type)
             if len(self.qtype_names) > 1:
-                raise NotImplementedError("CWL reference implementation "
-                                          "does not support unions containing "
-                                          "multiple array types")
-            self.type_name = self.qtype_names
+                self.type_name = QIIME_STR_TYPE
+            else:
+                self.type_name = self.qtype_names[0]
         else:
             self.qtype_names = [self.inner_spec.qiime_type.name]
             self.type_name = self.inner_type.name
 
         self._suffix = '[]' + self._suffix
+
+    def _convert_args(self, convertable_args):
+        return get_possibly_str_collection_args(convertable_args, self.qtype_names)
 
 
 class CwlMetadataTabularCase(CwlParamCase):
@@ -253,13 +264,8 @@ class CwlOutputCase(CwlParamCase):
                  is_optional=None, default=None):
         super().__init__(name, spec, arg, type_name, is_optional, default)
 
-    # TODO: this doesn't provide output objects for any outputs to directories.
-    #  CWL does support output directory objects (see cwl export tool, which
-    #  has an output with type ['File', 'Directory']) but I don't know of any
-    #  way to tell from an *arbitrary* qiime input string whether it represents
-    #  the name of an output directory (the tools export template was created
-    #  manually by a human with the knowledge that one of the input param
-    #  strings specifies a directory name).
+    # TODO: when more explicit handling for directory inputs is phased in,
+    #  we can add logic here to determine if the output is a file or a dir
     def outputs(self):
         out_binding_str = f"$(inputs.{self.name})"
         output_dict = {
@@ -309,7 +315,8 @@ class CwlFileAndDirCase(CwlPrimitiveUnionCase):
         return output_dict
 
     def args(self):
-        # TODO: how do I figure out if it is a file or a dir?
+        # TODO: when more explicit handling for directory inputs is phased in,
+        #  we can add logic here to determine if the input is a file or a dir
         is_file = True
         return _make_file_or_path_arg_dict(self.name, self.arg, is_file)
 
