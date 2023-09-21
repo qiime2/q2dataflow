@@ -42,6 +42,22 @@ def get_multiple_qtype_names(spec_qiime_type):
     return qtypes_list
 
 
+def get_possibly_str_collection_args(arg, qtype_names):
+    str_args = []
+    args = arg
+    if len(qtype_names) > 1:
+        if arg is not None:
+            for curr_arg in arg:
+                # if there are multiple types, some languages (wdl, cwl) have
+                # to punt by treating the param's variable as a string, so all
+                # arguments to that variable need to be converted to strings
+                str_args.append(str(curr_arg))
+    if len(str_args) > 0:
+        args = str_args
+
+    return args
+
+
 class ParamCase:
     dataflow_prefix = None  # Will be defined in child classes
     _dataflow_keywords = []  # Will be defined in child classes
@@ -82,6 +98,9 @@ class ParamCase:
 
         self.synth_param_name = None
 
+    def _convert_args(self, convertable_args):
+        return convertable_args
+
     def inputs(self):
         raise NotImplementedError(self.__class__)
 
@@ -91,6 +110,8 @@ class ParamCase:
         args = self.arg
         if type(self.arg) == set:
             args = list(self.arg)
+
+        args = self._convert_args(args)
 
         if args is not None:
             result[self.name] = args
