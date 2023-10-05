@@ -83,7 +83,30 @@ def _convert_arguments(signature, inputs, parse_primitives=False):
 
         elif qiime2.sdk.util.is_collection_type(type_):
             if k in signature.inputs:
-                processed_inputs[k] = [sdk.Artifact.load(x) for x in v]
+                if type_.name == 'List' or type_.name == 'Set':
+                    processed_input = []
+
+                    for curr_fp in v:
+                        if curr_fp is not None:
+                            processed_input.append(sdk.Artifact.load(curr_fp))
+
+                    # Handle unprovided optional lists or sets
+                    if processed_input == []:
+                        processed_input = None
+
+                    processed_inputs[k] = processed_input
+                elif type_.name == 'Collection':
+                    # here, v should be a directory path
+                    processed_input = sdk.ResultCollection.load(v)
+
+                    # Handle unprovided optional collections
+                    if processed_input.collection == {}:
+                        processed_input = None
+
+                    processed_inputs[k] = processed_input
+                else:
+                    raise NotImplementedError(
+                        f"Collection type '{type}' not supported")
             elif v == []:
                 if signature.parameters[k].has_default():
                     processed_inputs[k] = signature.parameters[k].default
@@ -101,8 +124,11 @@ def _convert_arguments(signature, inputs, parse_primitives=False):
             processed_inputs[k] = _convert_metadata(type_, inputs[k], k)
 
         elif k in signature.inputs:
-            processed_inputs[k] = sdk.Artifact.load(v)
-
+            # Handle unprovided artifact
+            if v is None:
+                processed_inputs[k] = None
+            else:
+                processed_inputs[k] = sdk.Artifact.load(v)
         else:
             v_val = parse_primitive(type_, v) if parse_primitives else v
             processed_inputs[k] = v_val

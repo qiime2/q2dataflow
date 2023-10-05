@@ -211,6 +211,10 @@ def cwl_template(ctx):
 @click.argument('inputs-json',
                 type=click.Path(file_okay=True, dir_okay=False, exists=True))
 def run_cwl(plugin, action, inputs_json):
+    # TODO: remove copy of inputs json
+    #import shutil
+    #shutil.copy(inputs_json, "/Users/abirmingham/Desktop/test1")
+
     with open(inputs_json, 'r') as fh:
         raw_inputs_json = json.load(fh)
         config = raw_inputs_json['inputs']
@@ -230,4 +234,7 @@ cwl_template.add_command(_template_builtins)
 cwl_template.add_command(_template_all)
 
 if __name__ == '__main__':
+    # TODO: take out debugging call and put back root call
+    #run_cwl(["mystery_stew", "collection_artifact_params_3", "/Users/abirmingham/Desktop/test1/inputs.json"])
+    #run_wdl(["mystery_stew", "collection_primitive_union_params_1", "/Users/abirmingham/Desktop/test1/20231005_140832_wkflw_qiime2_mystery_stew_collection_primitive_union_params_1/call-qiime2_mystery_stew_collection_primitive_union_params_1/inputs.json"])
     root()

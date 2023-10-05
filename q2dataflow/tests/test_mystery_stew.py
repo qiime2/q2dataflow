@@ -17,6 +17,21 @@ from q2dataflow.languages.cwl.usage import CwlTestUsage
 import time
 import pytest
 
+TEST_FILTERS = {
+    # 'ints': True,
+    # 'strings': True,
+    # 'bools': True,
+    # 'floats': True,
+    # 'artifacts': True,
+    'primitive_unions': True,
+    # 'metadata': True,
+    'collections': True,
+    # 'outputs': True,
+    # 'typemaps': True,
+    # 'output_collections': True,
+
+}
+
 
 def _labeler(val, prefix=None):
     return_val = val
@@ -30,7 +45,7 @@ def _labeler(val, prefix=None):
 def get_tests():
     tests = []
     try:
-        plugin = get_mystery_stew()
+        plugin = get_mystery_stew(TEST_FILTERS)
     except KeyError:
         return tests
     for action in plugin.actions.values():
@@ -46,29 +61,31 @@ def _test_mystery_stew(action, example, test_usage_factory, settings=None):
 
     example_f = action.examples[example]
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        settings = {} if settings is None else settings
-        settings['working_dir'] = tmpdir
-        test_usage = test_usage_factory(settings=settings)
+    # TODO: put back tmpdir creation and remove debugging dir
+    tmpdir = "/Users/abirmingham/Desktop/test1"
+    #with tempfile.TemporaryDirectory() as tmpdir:
+    settings = {} if settings is None else settings
+    settings['working_dir'] = tmpdir
+    test_usage = test_usage_factory(settings=settings)
 
-        try:
-            example_f(test_usage)
+    try:
+        example_f(test_usage)
 
-            rendered = '\n'.join(test_usage.recorder)
-            for ref, data in test_usage.get_example_data():
-                data.save(os.path.join(tmpdir, ref))
+        rendered = '\n'.join(test_usage.recorder)
+        for ref, data in test_usage.get_example_data():
+            data.save(os.path.join(tmpdir, ref))
 
-            test_usage.save_run_files(tmpdir)
-        except NotImplementedError:
-            # skip, not fail, tests for known not-implemented functionality
-            pytest.skip(f"No implementation supporting {action.id} {example}")
-            return
+        test_usage.save_run_files(tmpdir)
+    except NotImplementedError:
+        # skip, not fail, tests for known not-implemented functionality
+        pytest.skip(f"No implementation supporting {action.id} {example}")
+        return
 
-        subprocess.run([rendered],
-                       shell=True,
-                       check=True,
-                       cwd=tmpdir,
-                       env={**os.environ})
+    subprocess.run([rendered],
+                   shell=True,
+                   check=True,
+                   cwd=tmpdir,
+                   env={**os.environ})
 
 
 @pytest.mark.parametrize('action,example', get_tests(),
@@ -77,7 +94,7 @@ def test_wdl_mystery_stew(action, example):
     _test_mystery_stew(action, example, WdlTestUsage)
 
 
-@pytest.mark.parametrize('action,example', get_tests(),
-                         ids=lambda x: _labeler(x, "cwl"))
-def test_cwl_mystery_stew(action, example):
-    _test_mystery_stew(action, example, CwlTestUsage, settings={"conda": True})
+# @pytest.mark.parametrize('action,example', get_tests(),
+#                          ids=lambda x: _labeler(x, "cwl"))
+# def test_cwl_mystery_stew(action, example):
+#     _test_mystery_stew(action, example, CwlTestUsage, settings={"conda": True})

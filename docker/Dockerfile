@@ -9,7 +9,7 @@ RUN git clone --branch cwl_support https://github.com/qiime2/q2dataflow.git
 RUN pip install -e ./q2dataflow
 
 # TODO ask Evan re options for auto-detecting qiime env name
-RUN echo "conda activate qiime2-2023.5" >> ~/.profile
+RUN echo "conda activate qiime2-2023.7" >> ~/.profile
 
 ENV MYSTERY_STEW=1
 RUN qiime dev refresh-cache
