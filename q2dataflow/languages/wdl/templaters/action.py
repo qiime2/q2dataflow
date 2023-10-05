@@ -5,6 +5,7 @@
 #
 # The full license is in the file LICENSE, distributed with this software.
 # ----------------------------------------------------------------------------
+import re
 from q2dataflow.core.signature_converter.case import make_action_template_id
 from q2dataflow.core.signature_converter.util import \
     get_q2_version, get_copyright
@@ -66,8 +67,19 @@ class WdlActionTemplate(DataflowActionTemplate):
 
     def _get_input_assignments(self, separator=": ", delimiter=",\n        "):
         inputs = self._get_param_strs(True, False)
-        input_names_only = [x.split()[1] for x in inputs]
-        input_name_pairs = [f"{x}{separator}{x}" for x in input_names_only]
+        # Use a pattern that matches square brackets and their contents to
+        # strip out the brackets of type info from any Map types in the params.
+        # This takes a string like "String a, Map[String, Int] b" and returns
+        # "String a, Map b", which we can then split on spaces to get names
+        pattern = r'\[[^\]]*\]'
+
+        input_name_pairs = []
+        for curr_input_str in inputs:
+            curr_stripped_input = re.sub(pattern, '', curr_input_str)
+            curr_name_only = curr_stripped_input.split()[1]
+            input_name_pairs.append(
+                f"{curr_name_only}{separator}{curr_name_only}")
+
         return delimiter.join(input_name_pairs)
 
     def _get_outputs(self, delimiter="\n        "):

@@ -1,6 +1,8 @@
+import re
 from q2dataflow.core.signature_converter.case import SignatureConverter, \
     ParamCase, BaseSimpleCollectionCase, QIIME_STR_TYPE, QIIME_BOOL_TYPE, \
-    get_multiple_qtype_names, get_possibly_str_collection_args
+    QIIME_COLLECTION_TYPE, get_multiple_qtype_names, \
+    get_possibly_str_collection_args
 
 q2wdl_prefix = "q2wdl_"
 metafile_synth_param_prefix = f"{q2wdl_prefix}metafile_"
@@ -43,6 +45,13 @@ def _make_array_input_dec(input_name, input_internal_type,
     return _make_input_dec_str(input_name, wdl_type, is_optional, default_val)
 
 
+def _make_map_input_dec(input_name, input_internal_type,
+                        is_optional, default_val):
+    internal_wdl_type = _internal_to_wdl_type[input_internal_type]
+    wdl_type = f"Map[String, {internal_wdl_type}]"
+    return _make_input_dec_str(input_name, wdl_type, is_optional, default_val)
+
+
 def _make_file_input_dec(input_name, is_optional, default_val):
     return _make_input_dec_str(
         input_name, _wdl_file_type, is_optional, default_val)
@@ -82,6 +91,29 @@ def _make_array_inputs(name, array_inner_type, is_optional, default,
                 default_str = f" = [{default_list_str}]"
             else:
                 default_str = f" = {default}"
+
+        param = f"{param}{default_str}"
+
+    return [param]
+
+
+def _make_map_inputs(name, map_inner_type, is_optional, default,
+                       include_defaults=False):
+    param = _make_map_input_dec(name, map_inner_type, is_optional, default)
+
+    if include_defaults:
+        default_str = ""
+        if is_optional and default is not None:
+            default_rewrites = {}
+            for k,v in default:
+                if map_inner_type == QIIME_BOOL_TYPE:
+                    default_rewrites[k] = WdlBoolCase.py_to_wdl_bool_val(v)
+                elif map_inner_type in [QIIME_STR_TYPE, _wdl_file_type]:
+                    default_rewrites[k] = f"'{v}'"
+                else:
+                    default_rewrites[k] = v
+
+            default_str = f" = {default}"
 
         param = f"{param}{default_str}"
 
@@ -273,9 +305,14 @@ class WdlSimpleCollectionCase(BaseSimpleCollectionCase, WdlParamCase):
         else:
             param_type = self.qtype_names[0]
 
-        return _make_array_inputs(
-            self.name, param_type, self.is_optional, self.default,
-            include_defaults=include_defaults)
+        if self.spec.qiime_type.name != QIIME_COLLECTION_TYPE:
+            return _make_array_inputs(
+                self.name, param_type, self.is_optional, self.default,
+                include_defaults=include_defaults)
+        else:
+            return _make_map_inputs(
+                self.name, param_type, self.is_optional, self.default,
+                include_defaults=include_defaults)
 
     def args(self):
         result = {}

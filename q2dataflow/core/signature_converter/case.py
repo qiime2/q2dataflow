@@ -13,6 +13,7 @@ from qiime2.core.type.signature import ParameterSpec
 
 QIIME_STR_TYPE = "Str"
 QIIME_BOOL_TYPE = "Bool"
+QIIME_COLLECTION_TYPE = "Collection"
 
 
 def make_action_template_id(plugin_id, action_id, replace_underscores=True):

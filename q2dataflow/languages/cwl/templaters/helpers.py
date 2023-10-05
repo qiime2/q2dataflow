@@ -1,6 +1,7 @@
 from q2dataflow.core.signature_converter.case import SignatureConverter, \
     ParamCase, BaseSimpleCollectionCase, QIIME_STR_TYPE, QIIME_BOOL_TYPE, \
-    get_multiple_qtype_names, get_possibly_str_collection_args
+    QIIME_COLLECTION_TYPE, get_multiple_qtype_names, \
+    get_possibly_str_collection_args
 
 q2cwl_prefix = "q2cwl_"
 metafile_synth_param_prefix = f"{q2cwl_prefix}metafile_"
@@ -131,21 +132,24 @@ class CwlInputCase(CwlParamCase):
                  is_optional=None, default=None, multiple=False):
         super().__init__(name, spec, arg, type_name, is_optional, default)
         self.multiple = multiple
+        self._is_file = self.spec.qiime_type.name != QIIME_COLLECTION_TYPE
 
     def inputs(self):
-        if self.multiple:
-            self._suffix = "[]" + self._suffix
         if self.spec and self.spec.has_default() and self.spec.default is not None:
             raise NotImplementedError("inputs with non-None default values")
 
-        input_dict = self._make_param_dict_for_type_or_types(_cwl_file_type)
+        if self._is_file:
+            input_type = _cwl_file_type
+            if self.multiple:
+                self._suffix = "[]" + self._suffix
+        else:
+            input_type = _cwl_dir_type
+
+        input_dict = self._make_param_dict_for_type_or_types(input_type)
         return input_dict
 
     def args(self):
-        # TODO: when more explicit handling for directory inputs is phased in,
-        #  we can add logic here to determine if the input is a file or a dir
-        is_file = True
-        return _make_file_or_path_arg_dict(self.name, self.arg, is_file)
+        return _make_file_or_path_arg_dict(self.name, self.arg, self._is_file)
 
 
 class CwlStrCase(CwlParamCase):
@@ -268,9 +272,16 @@ class CwlOutputCase(CwlParamCase):
     #  we can add logic here to determine if the output is a file or a dir
     def outputs(self):
         out_binding_str = f"$(inputs.{self.name})"
+        type_suffix = "file"
+        cwl_type = _cwl_file_type
+
+        if self.spec.qiime_type.name == 'Collection':
+            type_suffix = "dir"
+            cwl_type = _cwl_dir_type
+
         output_dict = {
-            (self.name + "_file"): {
-                'type': _cwl_file_type,
+            (self.name + "_" + type_suffix): {
+                'type': cwl_type,
                 'doc': self._make_doc_str(),
                 'outputBinding': {'glob': out_binding_str}
             }
