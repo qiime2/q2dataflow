@@ -18,17 +18,17 @@ import time
 import pytest
 
 TEST_FILTERS = {
-    # 'ints': True,
-    # 'strings': True,
-    # 'bools': True,
-    # 'floats': True,
-    # 'artifacts': True,
+    'ints': True,
+    'strings': True,
+    'bools': True,
+    'floats': True,
+    'artifacts': True,
     'primitive_unions': True,
-    # 'metadata': True,
+    'metadata': True,
     'collections': True,
-    # 'outputs': True,
-    # 'typemaps': True,
-    # 'output_collections': True,
+    'outputs': True,
+    'typemaps': True,
+    'output_collections': True,
 
 }
 
@@ -62,30 +62,30 @@ def _test_mystery_stew(action, example, test_usage_factory, settings=None):
     example_f = action.examples[example]
 
     # TODO: put back tmpdir creation and remove debugging dir
-    tmpdir = "/Users/abirmingham/Desktop/test1"
-    #with tempfile.TemporaryDirectory() as tmpdir:
-    settings = {} if settings is None else settings
-    settings['working_dir'] = tmpdir
-    test_usage = test_usage_factory(settings=settings)
+    #tmpdir = "/Users/abirmingham/Desktop/test1"
+    with tempfile.TemporaryDirectory() as tmpdir:
+        settings = {} if settings is None else settings
+        settings['working_dir'] = tmpdir
+        test_usage = test_usage_factory(settings=settings)
 
-    try:
-        example_f(test_usage)
+        try:
+            example_f(test_usage)
 
-        rendered = '\n'.join(test_usage.recorder)
-        for ref, data in test_usage.get_example_data():
-            data.save(os.path.join(tmpdir, ref))
+            rendered = '\n'.join(test_usage.recorder)
+            for ref, data in test_usage.get_example_data():
+                data.save(os.path.join(tmpdir, ref))
 
-        test_usage.save_run_files(tmpdir)
-    except NotImplementedError:
-        # skip, not fail, tests for known not-implemented functionality
-        pytest.skip(f"No implementation supporting {action.id} {example}")
-        return
+            test_usage.save_run_files(tmpdir)
+        except NotImplementedError:
+            # skip, not fail, tests for known not-implemented functionality
+            pytest.skip(f"No implementation supporting {action.id} {example}")
+            return
 
-    subprocess.run([rendered],
-                   shell=True,
-                   check=True,
-                   cwd=tmpdir,
-                   env={**os.environ})
+        subprocess.run([rendered],
+                       shell=True,
+                       check=True,
+                       cwd=tmpdir,
+                       env={**os.environ})
 
 
 @pytest.mark.parametrize('action,example', get_tests(),

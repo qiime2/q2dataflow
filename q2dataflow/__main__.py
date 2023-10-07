@@ -6,6 +6,7 @@
 # The full license is in the file LICENSE, distributed with this software.
 # ----------------------------------------------------------------------------
 import click
+from click.testing import CliRunner
 import json
 
 import q2dataflow.core.description_language.interface as clickin
@@ -16,7 +17,8 @@ from q2dataflow.languages.wdl.templaters.helpers import \
 from q2dataflow.languages.cwl.templaters.helpers import \
     q2cwl_prefix as cwl_prefix, \
     metafile_synth_param_prefix as cwl_metafile_synth_prefix, \
-    reserved_param_prefix as cwl_reserved_prefix
+    reserved_param_prefix as cwl_reserved_prefix, \
+    collection_keys_prefix as cwl_collection_keys_prefix
 import q2dataflow.languages.wdl.util as wdl_util
 import q2dataflow.languages.cwl.util as cwl_util
 
@@ -73,8 +75,34 @@ def _reformat_metadata_param(curr_metafile_key, params_dict,
     return params_dict
 
 
+def _reformat_collection_param(curr_collection_key, params_dict,
+                               collection_keys_prefix):
+    new_param_val = []
+
+    # get the list of collection keys out of the param dict and remove it
+    collection_keys = params_dict[curr_collection_key]
+    params_dict.pop(curr_collection_key)
+
+    # get the list of collection values out of the param dict
+    param_name = curr_collection_key.replace(collection_keys_prefix, "")
+    collection_vals = params_dict[param_name]
+
+    if collection_keys is None and collection_vals is None:
+        new_param_val = None
+    else:
+        if len(collection_keys) != len(collection_vals):
+            raise ValueError("Collection keys and values must "
+                             "be the same length")
+
+        new_param_val = dict(zip(collection_keys, collection_vals))
+    # endif
+
+    params_dict[param_name] = new_param_val
+
+
 def _reformat_special_params(params_dict, lang_prefix,
-                             metadata_prefix, reserved_prefix):
+                             metadata_prefix, reserved_prefix,
+                             collection_keys_prefix=None):
     # find and deal with any "special" params inserted by templating
     lang_special_keys = [x for x in params_dict.keys()
                          if x.startswith(lang_prefix)]
@@ -85,6 +113,10 @@ def _reformat_special_params(params_dict, lang_prefix,
             native_key = curr_key.replace(reserved_prefix, "")
             params_dict[native_key] = params_dict[curr_key]
             params_dict.pop(curr_key)
+        elif collection_keys_prefix is not None and \
+                curr_key.startswith(collection_keys_prefix):
+            _reformat_collection_param(curr_key, params_dict,
+                                       collection_keys_prefix)
         else:
             raise ValueError(f"Unrecognized special prefix: '{curr_key}'")
 
@@ -212,8 +244,8 @@ def cwl_template(ctx):
                 type=click.Path(file_okay=True, dir_okay=False, exists=True))
 def run_cwl(plugin, action, inputs_json):
     # TODO: remove copy of inputs json
-    #import shutil
-    #shutil.copy(inputs_json, "/Users/abirmingham/Desktop/test1")
+    # import shutil
+    # shutil.copy(inputs_json, "/Users/abirmingham/Desktop/test1")
 
     with open(inputs_json, 'r') as fh:
         raw_inputs_json = json.load(fh)
@@ -221,7 +253,8 @@ def run_cwl(plugin, action, inputs_json):
 
     config = _reformat_cwl_path_params(config)
     config = _reformat_special_params(
-        config, cwl_prefix, cwl_metafile_synth_prefix, cwl_reserved_prefix)
+        config, cwl_prefix, cwl_metafile_synth_prefix, cwl_reserved_prefix,
+        cwl_collection_keys_prefix)
 
     clickin.run(plugin, action, config, parse_primitives=True)
 
@@ -235,6 +268,6 @@ cwl_template.add_command(_template_all)
 
 if __name__ == '__main__':
     # TODO: take out debugging call and put back root call
-    #run_cwl(["mystery_stew", "collection_artifact_params_3", "/Users/abirmingham/Desktop/test1/inputs.json"])
-    #run_wdl(["mystery_stew", "collection_primitive_union_params_1", "/Users/abirmingham/Desktop/test1/20231005_140832_wkflw_qiime2_mystery_stew_collection_primitive_union_params_1/call-qiime2_mystery_stew_collection_primitive_union_params_1/inputs.json"])
+    #run_cwl(["mystery_stew", "collection_primitive_union_params_1", "/Users/abirmingham/Desktop/test1/inputs.json"])
+    #run_wdl(["mystery_stew", "collection_artifact_params_1", "/Users/abirmingham/Desktop/test1/20231006_163646_wkflw_qiime2_mystery_stew_collection_artifact_params_1/call-qiime2_mystery_stew_collection_artifact_params_1/inputs.json"])
     root()

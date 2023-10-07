@@ -9,12 +9,13 @@ metafile_synth_param_prefix = f"{q2wdl_prefix}metafile_"
 reserved_param_prefix = f"{q2wdl_prefix}reserved_"
 
 _wdl_file_type = "File"
+_wdl_str_type = "String"
 
 _internal_to_wdl_type = {
     "Int": "Int",
     "Float": "Float",
     QIIME_BOOL_TYPE: "Boolean",
-    QIIME_STR_TYPE: "String",
+    QIIME_STR_TYPE: _wdl_str_type,
     _wdl_file_type: _wdl_file_type
 }
 
@@ -48,7 +49,7 @@ def _make_array_input_dec(input_name, input_internal_type,
 def _make_map_input_dec(input_name, input_internal_type,
                         is_optional, default_val):
     internal_wdl_type = _internal_to_wdl_type[input_internal_type]
-    wdl_type = f"Map[String, {internal_wdl_type}]"
+    wdl_type = f"Map[{_wdl_str_type}, {internal_wdl_type}]"
     return _make_input_dec_str(input_name, wdl_type, is_optional, default_val)
 
 
@@ -98,24 +99,26 @@ def _make_array_inputs(name, array_inner_type, is_optional, default,
 
 
 def _make_map_inputs(name, map_inner_type, is_optional, default,
-                       include_defaults=False):
+                     include_defaults=False):
     param = _make_map_input_dec(name, map_inner_type, is_optional, default)
 
     if include_defaults:
-        default_str = ""
+        default_exp = ""
         if is_optional and default is not None:
             default_rewrites = {}
-            for k,v in default:
+            for k, v in default.items():
                 if map_inner_type == QIIME_BOOL_TYPE:
                     default_rewrites[k] = WdlBoolCase.py_to_wdl_bool_val(v)
                 elif map_inner_type in [QIIME_STR_TYPE, _wdl_file_type]:
-                    default_rewrites[k] = f"'{v}'"
+                    default_rewrites[k] = str(v)
                 else:
                     default_rewrites[k] = v
+                # endif
+            # next item
 
-            default_str = f" = {default}"
+            default_exp = f" = {default_rewrites}"
 
-        param = f"{param}{default_str}"
+        param = f"{param}{default_exp}"
 
     return [param]
 
@@ -128,6 +131,9 @@ class WdlParamCase(ParamCase):
                  is_optional=None, default=None):
         super().__init__(
             name, spec, arg, type_name, is_optional, default)
+
+        self._is_collection = \
+            self.spec.qiime_type.name == QIIME_COLLECTION_TYPE
 
     def _make_input_dec(self):
         return _make_basic_input_dec(
@@ -166,12 +172,17 @@ class WdlInputCase(WdlParamCase):
             raise NotImplementedError(
                 "inputs with non-None default values")
 
-        if self.multiple:
+        # if this is a collection of inputs, represent its directory path as a
+        # string (since WDL doesn't currently have a Directory type); otherwise
+        # represent it as a File type
+        curr_type = QIIME_STR_TYPE if self._is_collection else _wdl_file_type
+
+        if self.multiple and not self._is_collection:
             param = _make_array_input_dec(
-                self.name, _wdl_file_type, self.is_optional, self.default)
+                self.name, curr_type, self.is_optional, self.default)
         else:
-            param = _make_file_input_dec(
-                self.name, self.is_optional, self.default)
+            param = _make_basic_input_dec(self.name, curr_type,
+                                          self.is_optional, self.default)
 
         if include_defaults:
             param = _make_basic_default(param, self.is_optional, self.default)
@@ -289,7 +300,6 @@ class WdlColumnTabularCase(WdlParamCase):
         return result
 
 
-# TODO can simple collection be something >1 dimensional (like dict)?
 class WdlSimpleCollectionCase(BaseSimpleCollectionCase, WdlParamCase):
     def __init__(self, name, spec, arg=None):
         super().__init__(name, spec, arg)
@@ -305,7 +315,7 @@ class WdlSimpleCollectionCase(BaseSimpleCollectionCase, WdlParamCase):
         else:
             param_type = self.qtype_names[0]
 
-        if self.spec.qiime_type.name != QIIME_COLLECTION_TYPE:
+        if not self._is_collection:
             return _make_array_inputs(
                 self.name, param_type, self.is_optional, self.default,
                 include_defaults=include_defaults)
@@ -364,10 +374,13 @@ class WdlOutputCase(WdlParamCase):
     #  "visualization_file" because you can't reuse the same param name for
     #  both an input and an output. This is done below.
     def outputs(self):
-        file_param_name = self.name + "_file"
-        dec_base = _make_file_input_dec(file_param_name, False, None)
-        dec_str = f"{dec_base} = \"~{{{self.name}}}\""
-        return [dec_str]
+        result = []
+        if not self._is_collection:
+            file_param_name = self.name + "_file"
+            dec_base = _make_file_input_dec(file_param_name, False, None)
+            dec_str = f"{dec_base} = \"~{{{self.name}}}\""
+            result = [dec_str]
+        return result
 
 
 class WdlSignatureConverter(SignatureConverter):

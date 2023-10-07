@@ -18,11 +18,12 @@ class CwlTestUsage(DataflowTestUsage):
         super().__init__(settings=settings)
         self._working_dir = settings['working_dir']
 
-    def get_run_command(self):
-        return f"cwltool --debug --preserve-entire-environment " \
-               f"--outdir {self._working_dir} " \
-               f"{self._template_fname} " \
-               f"{self.params_fname}"
+    def get_run_commands(self):
+        cmd = f"cwltool --debug --preserve-entire-environment " \
+              f"--outdir {self._working_dir} " \
+              f"{self._template_fname} " \
+              f"{self.params_fname}"
+        return [cmd]
 
     def dump_input_dict(self, inputs_dict, i):
         yaml.dump(inputs_dict, i)
