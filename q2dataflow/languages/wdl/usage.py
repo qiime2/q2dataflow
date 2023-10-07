@@ -24,7 +24,12 @@ class WdlTestUsage(DataflowTestUsage):
         with open(config_fp, "w") as c:
             c.write(config_str)
 
-    def get_run_command(self):
-        return f"miniwdl run {self._template_fname} " \
+    def get_run_commands(self):
+        cmd = f"miniwdl run {self._template_fname} " \
                f"--input {self.params_fname} " \
                f"--cfg {self.config_fname}"
+
+        work_find_and_sync_cmd = 'find . -type d -name "work" -exec rsync ' \
+                                 '-av --exclude="_miniwdl*" {}/ "./" \;'
+
+        return [cmd, work_find_and_sync_cmd]

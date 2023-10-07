@@ -44,15 +44,22 @@ def get_multiple_qtype_names(spec_qiime_type):
 
 
 def get_possibly_str_collection_args(arg, qtype_names):
-    str_args = []
     args = arg
+    str_args = None
+
+    # if there are multiple types, some languages (wdl, cwl) have
+    # to punt by treating the param's variable as a string, so all
+    # arguments to that variable need to be converted to strings
     if len(qtype_names) > 1:
         if arg is not None:
-            for curr_arg in arg:
-                # if there are multiple types, some languages (wdl, cwl) have
-                # to punt by treating the param's variable as a string, so all
-                # arguments to that variable need to be converted to strings
-                str_args.append(str(curr_arg))
+            try:
+                items = arg.items()
+            except (AttributeError, TypeError):
+                str_args = [str(x) for x in arg]
+            else:
+                # no exception raised--meaning this quacks like a dict
+                str_args = {str(k): str(v) for k, v in items}
+
     if len(str_args) > 0:
         args = str_args
 

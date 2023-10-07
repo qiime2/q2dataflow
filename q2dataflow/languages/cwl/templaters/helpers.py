@@ -6,6 +6,7 @@ from q2dataflow.core.signature_converter.case import SignatureConverter, \
 q2cwl_prefix = "q2cwl_"
 metafile_synth_param_prefix = f"{q2cwl_prefix}metafile_"
 reserved_param_prefix = f"{q2cwl_prefix}reserved_"
+collection_keys_prefix = f"{q2cwl_prefix}collection_keys_"
 
 _cwl_file_type = "File"
 _cwl_dir_type = "Directory"
@@ -221,7 +222,6 @@ class CwlColumnTabularCase(CwlParamCase):
         return result
 
 
-# TODO Evan, can simple collection be something >1 dimensional (like dict)?
 class CwlSimpleCollectionCase(CwlParamCase, BaseSimpleCollectionCase):
     def __init__(self, name, spec, arg=None, type_name=None,
                  is_optional=None, default=None):
@@ -243,6 +243,70 @@ class CwlSimpleCollectionCase(CwlParamCase, BaseSimpleCollectionCase):
 
     def _convert_args(self, convertable_args):
         return get_possibly_str_collection_args(convertable_args, self.qtype_names)
+
+
+class CwlSimpleCollectionDictCase(CwlSimpleCollectionCase, BaseSimpleCollectionCase):
+    def __init__(self, name, spec, arg=None, type_name=None,
+                 is_optional=None, default=None):
+        super(CwlSimpleCollectionDictCase, self).__init__(
+            name, spec, arg=arg, type_name=type_name, is_optional=is_optional,
+            default=default)
+
+        # if len(self.qtype_names) > 1:
+        #     raise NotImplementedError("Collections of multiple types")
+
+        # Note: here the synth param holds the array of keys
+        # and the "regular" param name holds the (parallel) array of values
+        self.synth_param_name = \
+            f"{collection_keys_prefix}{self.name}"
+
+    def _make_parallel_lists_from_dict(self, a_dict):
+        make_vals_strs = self.type_name == QIIME_STR_TYPE
+
+        key_strs = [str(x) for x in a_dict.keys()]
+        if make_vals_strs:
+            val_strs = [str(x) for x in a_dict.values()]
+        else:
+            val_strs = list(a_dict.values())
+        return key_strs, val_strs
+
+    def inputs(self):
+        keys_dict = {
+            'type': 'string' + self._suffix,
+            'doc': 'keys for %r collection' % self.name,
+        }
+
+        cwl_type = _internal_to_cwl_type[self.type_name]
+        doc_str = 'values for %r collection' % self.name
+        main_doc_str = self._make_doc_str()
+        if main_doc_str is not None:
+            doc_str = main_doc_str + ".  " + doc_str
+        vals_dict = {
+            'type': cwl_type + self._suffix,
+            'doc': doc_str
+        }
+
+        if self.is_optional and self.default is not None:
+            key_strs, val_strs = self._make_parallel_lists_from_dict(
+                self.default)
+            keys_dict['default'] = key_strs
+            vals_dict['default'] = val_strs
+
+        param_dict = {
+            self.synth_param_name: keys_dict,
+            self.name: vals_dict
+        }
+
+        return param_dict
+
+    def args(self):
+        result = {}
+        if self.arg is not None:
+            # expect argument to be in the form of a dictionary
+            key_strs, val_strs = self._make_parallel_lists_from_dict(self.arg)
+            result = {self.synth_param_name: key_strs,
+                      self.name: val_strs}
+        return result
 
 
 class CwlMetadataTabularCase(CwlParamCase):
@@ -268,8 +332,6 @@ class CwlOutputCase(CwlParamCase):
                  is_optional=None, default=None):
         super().__init__(name, spec, arg, type_name, is_optional, default)
 
-    # TODO: when more explicit handling for directory inputs is phased in,
-    #  we can add logic here to determine if the output is a file or a dir
     def outputs(self):
         out_binding_str = f"$(inputs.{self.name})"
         type_suffix = "file"
@@ -355,7 +417,10 @@ class CwlSignatureConverter(SignatureConverter):
         return CwlMetadataTabularCase(name, spec, arg)
 
     def get_simple_collection_case(self, name, spec, arg):
-        return CwlSimpleCollectionCase(name, spec, arg)
+        if spec.qiime_type.name == QIIME_COLLECTION_TYPE:
+            return CwlSimpleCollectionDictCase(name, spec, arg)
+        else:
+            return CwlSimpleCollectionCase(name, spec, arg)
 
     def get_output_case(self, name, spec, arg):
         return CwlOutputCase(name, spec, arg)

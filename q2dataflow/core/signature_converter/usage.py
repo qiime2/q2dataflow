@@ -34,10 +34,10 @@ class DataflowTestUsage(CLIUsage):
             action.plugin_id, action.action_id) + self.get_extension()
 
         self.recorder.append("export MYSTERY_STEW=1")
-        self.recorder.append(self.get_run_command())
+        self.recorder.extend(self.get_run_commands())
 
-        self.recorder.append(r"find . -iname '*.qza' -exec cp \{\} ./ \;")
-        self.recorder.append(r"find . -iname '*.qzv' -exec cp \{\} ./ \;")
+        #self.recorder.append(r"find . -iname '*.qza' -exec cp \{\} ./ \;")
+        #self.recorder.append(r"find . -iname '*.qzv' -exec cp \{\} ./ \;")
 
         return vars_
 
@@ -86,7 +86,7 @@ class DataflowTestUsage(CLIUsage):
     def make_config_file(self, working_dir):
         raise NotImplementedError("Subclasses must implement this method")
 
-    def get_run_command(self):
+    def get_run_commands(self):
         raise NotImplementedError("Subclasses must implement this method")
 
     def dump_input_dict(self, inputs_dict, inputs_fp):
