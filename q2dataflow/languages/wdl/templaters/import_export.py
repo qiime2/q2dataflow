@@ -3,8 +3,6 @@ from q2dataflow.languages.wdl.templaters.helpers import WdlStrCase, \
     WdlInputCase, WdlOutputCase
 
 
-# TODO ask Evan how to handle import from directories--not sure how that
-#  works w cromwell?  WDL has a File input but not a Directory one
 def make_builtin_import_template_str(template_id, settings):
     import_template = WdlActionTemplate("tools", "import", template_id)
     import_template.add_param(WdlStrCase("type", None, is_optional=False))

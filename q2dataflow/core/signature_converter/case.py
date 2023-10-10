@@ -52,18 +52,26 @@ def get_possibly_str_collection_args(arg, qtype_names):
     # arguments to that variable need to be converted to strings
     if len(qtype_names) > 1:
         if arg is not None:
-            try:
-                items = arg.items()
-            except (AttributeError, TypeError):
-                str_args = [str(x) for x in arg]
+            is_file = arg_is_file(arg)
+            if is_file:
+                str_args = str(arg)
             else:
-                # no exception raised--meaning this quacks like a dict
-                str_args = {str(k): str(v) for k, v in items}
+                str_args = {str(k): str(v) for k, v in arg.items()}
 
-    if len(str_args) > 0:
+    if str_args and len(str_args) > 0:
         args = str_args
 
     return args
+
+
+def arg_is_file(arg):
+    try:
+        items = arg.items()
+    except (AttributeError, TypeError):
+        return True
+    else:
+        # no exception raised--meaning this quacks like a dict
+        return False
 
 
 class ParamCase:
