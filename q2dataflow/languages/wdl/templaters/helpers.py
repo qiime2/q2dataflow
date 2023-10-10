@@ -105,18 +105,28 @@ def _make_map_inputs(name, map_inner_type, is_optional, default,
     if include_defaults:
         default_exp = ""
         if is_optional and default is not None:
-            default_rewrites = {}
+            # Default values are stored as list of tuple of strings instead of
+            # as a dictionary that is then converted to a string because WDL
+            # requires that a boolean be represented as lower-case true or
+            # false--which can't be represented in a dict except as a string,
+            # which then gets quotes around it when the dict is converted to a
+            # string, which WDL won't accept.
+            default_rewrites = []
             for k, v in default.items():
                 if map_inner_type == QIIME_BOOL_TYPE:
-                    default_rewrites[k] = WdlBoolCase.py_to_wdl_bool_val(v)
+                    k_v = (k, str.lower(str(v)))
                 elif map_inner_type in [QIIME_STR_TYPE, _wdl_file_type]:
-                    default_rewrites[k] = str(v)
+                    k_v = (k, f"'{str(v)}'")
                 else:
-                    default_rewrites[k] = v
+                    k_v = (k, v)
                 # endif
+
+                default_rewrites.append(k_v)
             # next item
 
-            default_exp = f" = {default_rewrites}"
+            default_rewrites_str = ", ".join(
+                [f"{k}: {v}" for k, v in default_rewrites])
+            default_exp = f" = {{{default_rewrites_str}}}"
 
         param = f"{param}{default_exp}"
 
