@@ -1,4 +1,6 @@
-import re
+import warnings
+from q2dataflow.core.signature_converter.util import \
+    UntestableImplementationWarning
 from q2dataflow.core.signature_converter.case import SignatureConverter, \
     ParamCase, BaseSimpleCollectionCase, QIIME_STR_TYPE, QIIME_BOOL_TYPE, \
     QIIME_COLLECTION_TYPE, get_multiple_qtype_names, \
@@ -181,6 +183,11 @@ class WdlInputCase(WdlParamCase):
         if self.default:
             raise NotImplementedError(
                 "inputs with non-None default values")
+
+        if self._is_collection:
+            warnings.warn(UntestableImplementationWarning(
+                "Unable to test Artifact Collection inputs for WDL "
+                "using miniWDL"))
 
         # if this is a collection of inputs, represent its directory path as a
         # string (since WDL doesn't currently have a Directory type); otherwise
