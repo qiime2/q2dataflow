@@ -383,13 +383,6 @@ class WdlOutputCase(WdlParamCase):
             raise NotImplementedError("outputs with default values")
         return [_make_basic_input_dec(self.name, QIIME_STR_TYPE, False, None)]
 
-    # TODO: ask Evan: are qiime2 plugin output names *always* captured via
-    #  inputs parameters? If so, WDL output entries need to rename the
-    #  output params: e.g., if the param that captures the output name is
-    #  named "visualization", then the output param that actually holds that
-    #  visualization file will need to be given a distinct name like
-    #  "visualization_file" because you can't reuse the same param name for
-    #  both an input and an output. This is done below.
     def outputs(self):
         result = []
         if not self._is_collection:
