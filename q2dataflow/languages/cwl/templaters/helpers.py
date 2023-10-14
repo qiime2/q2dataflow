@@ -1,7 +1,7 @@
 from q2dataflow.core.signature_converter.case import SignatureConverter, \
     ParamCase, BaseSimpleCollectionCase, QIIME_STR_TYPE, QIIME_BOOL_TYPE, \
     QIIME_COLLECTION_TYPE, get_multiple_qtype_names, \
-    get_possibly_str_collection_args, arg_is_file
+    get_possibly_str_collection_args, arg_is_dictlike
 
 q2cwl_prefix = "q2cwl_"
 metafile_synth_param_prefix = f"{q2cwl_prefix}metafile_"
@@ -388,7 +388,7 @@ class CwlFileAndDirCase(CwlPrimitiveUnionCase):
         return output_dict
 
     def args(self):
-        is_file = arg_is_file(self.arg)
+        is_file = not arg_is_dictlike(self.arg)
         return _make_file_or_path_arg_dict(self.name, self.arg, is_file)
 
 
