@@ -11,7 +11,9 @@
 import os
 import subprocess
 import tempfile
-from q2dataflow.core.signature_converter.util import get_mystery_stew
+import warnings
+from q2dataflow.core.signature_converter.util import \
+    get_mystery_stew, UntestableImplementationWarning
 from q2dataflow.languages.wdl.usage import WdlTestUsage
 from q2dataflow.languages.cwl.usage import CwlTestUsage
 import time
@@ -68,6 +70,7 @@ def _test_mystery_stew(action, example, test_usage_factory, settings=None):
         settings['working_dir'] = tmpdir
         test_usage = test_usage_factory(settings=settings)
 
+        warnings.filterwarnings('error')
         try:
             example_f(test_usage)
 
@@ -76,6 +79,11 @@ def _test_mystery_stew(action, example, test_usage_factory, settings=None):
                 data.save(os.path.join(tmpdir, ref))
 
             test_usage.save_run_files(tmpdir)
+        except UntestableImplementationWarning:
+            # skip, not fail, tests for functionality that is implemented but
+            # cannot be tested with the language emulators/etc. available
+            # (I'm looking at you, miniwdl)
+            pytest.skip(f"Unable to test implementation supporting {action.id} {example}")
         except NotImplementedError:
             # skip, not fail, tests for known not-implemented functionality
             pytest.skip(f"No implementation supporting {action.id} {example}")

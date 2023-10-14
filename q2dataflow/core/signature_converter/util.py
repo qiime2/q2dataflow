@@ -54,3 +54,7 @@ def _check_filters(specified_filters, all_filter_types):
     if len(missing_filter_types) > 0:
         missing_filter_types_str = ', '.join(missing_filter_types)
         warnings.warn(f"Not performing tests for: {missing_filter_types_str}")
+
+
+class UntestableImplementationWarning(Warning):
+    pass
