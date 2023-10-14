@@ -63,8 +63,6 @@ def _test_mystery_stew(action, example, test_usage_factory, settings=None):
 
     example_f = action.examples[example]
 
-    # TODO: put back tmpdir creation and remove debugging dir
-    #tmpdir = "/Users/abirmingham/Desktop/test1"
     with tempfile.TemporaryDirectory() as tmpdir:
         settings = {} if settings is None else settings
         settings['working_dir'] = tmpdir
