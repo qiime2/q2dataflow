@@ -133,7 +133,8 @@ class CwlInputCase(CwlParamCase):
                  is_optional=None, default=None, multiple=False):
         super().__init__(name, spec, arg, type_name, is_optional, default)
         self.multiple = multiple
-        self._is_file = self.spec.qiime_type.name != QIIME_COLLECTION_TYPE
+        self._is_file = (self.spec is not None and
+                         self.spec.qiime_type.name != QIIME_COLLECTION_TYPE)
 
     def inputs(self):
         if self.spec and self.spec.has_default() and self.spec.default is not None:
@@ -337,7 +338,8 @@ class CwlOutputCase(CwlParamCase):
         type_suffix = "file"
         cwl_type = _cwl_file_type
 
-        if self.spec.qiime_type.name == 'Collection':
+        if (self.spec is not None and
+                self.spec.qiime_type.name == QIIME_COLLECTION_TYPE):
             type_suffix = "dir"
             cwl_type = _cwl_dir_type
 

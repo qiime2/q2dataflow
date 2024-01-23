@@ -144,8 +144,8 @@ class WdlParamCase(ParamCase):
         super().__init__(
             name, spec, arg, type_name, is_optional, default)
 
-        self._is_collection = \
-            self.spec.qiime_type.name == QIIME_COLLECTION_TYPE
+        self._is_collection = (self.spec is not None and
+            self.spec.qiime_type.name == QIIME_COLLECTION_TYPE)
 
     def _make_input_dec(self):
         return _make_basic_input_dec(

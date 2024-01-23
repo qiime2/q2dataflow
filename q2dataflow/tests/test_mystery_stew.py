@@ -85,7 +85,6 @@ def _test_mystery_stew(action, example, test_usage_factory, settings=None):
         except NotImplementedError:
             # skip, not fail, tests for known not-implemented functionality
             pytest.skip(f"No implementation supporting {action.id} {example}")
-            return
 
         subprocess.run([rendered],
                        shell=True,
