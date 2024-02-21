@@ -9,7 +9,8 @@ class WdlTestUsage(DataflowTestUsage):
     dataflow_module_name = "q2dataflow.languages.wdl"
     params_fname = "template_params.json"
     docker_image = DOCKER_IMG_NAME
-    config_fname = f"{docker_image}.config"
+    # config_fname = f"{docker_image}.config"
+    config_fname = "temp.config"
 
     def dump_input_dict(self, inputs_dict, i):
         json.dump(inputs_dict, i)
