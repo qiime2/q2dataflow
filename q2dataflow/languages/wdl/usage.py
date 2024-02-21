@@ -2,8 +2,8 @@ import json
 import os.path
 from q2dataflow.core.signature_converter.usage import DataflowTestUsage
 
-DOCKER_IMG_NAME = "testq2dataflow"
-
+# DOCKER_IMG_NAME = "testq2dataflow"
+DOCKER_IMG_NAME = "localhost:5000/qiime2/testq2dataflow"
 
 class WdlTestUsage(DataflowTestUsage):
     dataflow_module_name = "q2dataflow.languages.wdl"
