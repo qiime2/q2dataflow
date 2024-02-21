@@ -11,8 +11,12 @@ from qiime2.sdk.util import (interrogate_collection_type, is_semantic_type,
                              is_metadata_column_type)
 from qiime2.core.type.signature import ParameterSpec
 
+QIIME_STR_TYPE = "Str"
+QIIME_BOOL_TYPE = "Bool"
+QIIME_COLLECTION_TYPE = "Collection"
 
-def make_tool_id(plugin_id, action_id, replace_underscores=True):
+
+def make_action_template_id(plugin_id, action_id, replace_underscores=True):
     if replace_underscores:
         munged_plugin_id = plugin_id.replace('_', '-')
         munged_action_id = action_id.replace('_', '-')
@@ -24,14 +28,110 @@ def make_tool_id(plugin_id, action_id, replace_underscores=True):
                      munged_action_id])
 
 
+def get_multiple_qtype_names(spec_qiime_type):
+    qtypes_list = []
+    for curr_included_type in spec_qiime_type:
+        if curr_included_type.name == "":
+            # NB: this happens in cases like when the current included type is
+            # *itself* a combination, like a primitive union, e.g.
+            # (Int % Range(5, 10) | Range(15, 20))
+            raise NotImplementedError(
+                f"Unable to map qiime type with members "
+                f"{curr_included_type.members} but without name to type "
+                f"in template language")
+        qtypes_list.append(curr_included_type.name)
+    return qtypes_list
+
+
+def get_possibly_str_collection_args(arg, qtype_names):
+    args = arg
+    str_args = None
+
+    # if there are multiple types, some languages (wdl, cwl) have
+    # to punt by treating the param's variable as a string, so all
+    # arguments to that variable need to be converted to strings
+    if len(qtype_names) > 1:
+        if arg is not None:
+            if arg_is_dictlike(arg):
+                str_args = {str(k): str(v) for k, v in arg.items()}
+            else:
+                str_args = [str(x) for x in arg]
+
+    if str_args and len(str_args) > 0:
+        args = str_args
+
+    return args
+
+
+def arg_is_dictlike(arg):
+    try:
+        items = arg.items()
+    except (AttributeError, TypeError):
+        return False
+    else:
+        # no exception raised--meaning this quacks like a dict
+        return True
+
+
 class ParamCase:
-    def __init__(self, name, spec, arg=None):
+    dataflow_prefix = None  # Will be defined in child classes
+    _dataflow_keywords = []  # Will be defined in child classes
+
+    def __init__(self, name, spec, arg=None, type_name=None,
+                 is_optional=None, default=None):
+        super(ParamCase, self).__init__()
         self.name = name
         self.spec = spec
         self.arg = arg
 
+        self.type_name = type_name
+        if type_name is None:
+            if self.spec:
+                # TODO the below doesn't handle multiple qiime_types ... need
+                #  something for that case like
+                #  self.type_name = spec.qiime_type.fields[0].name maybe?
+                self.type_name = self.spec.qiime_type.name
+            else:
+                # TODO: put in a warning?
+                pass
+
+        self.default = default
+        self.is_optional = is_optional
+        # Unless we are explicitly told this param is optional, dig for it ...
+        if is_optional is None:
+            if spec:
+                if self.spec.has_default():
+                    if self.spec.default != self.spec.NOVALUE:
+                        self.is_optional = True
+                        self.default = self.spec.default
+
+        self.reserved_param_prefix = f"{self.dataflow_prefix}reserved_"
+
+        if self.name in self._dataflow_keywords:
+            # can't use this as a param name bc it is a cwl reserved word
+            self.name = self.reserved_param_prefix + self.name
+
+        self.synth_param_name = None
+
+    def _convert_args(self, convertable_args):
+        return convertable_args
+
     def inputs(self):
         raise NotImplementedError(self.__class__)
+
+    def args(self):
+        result = {}
+
+        args = self.arg
+        if type(self.arg) == set:
+            args = list(self.arg)
+
+        args = self._convert_args(args)
+
+        if args is not None:
+            result[self.name] = args
+
+        return result
 
 
 class NotImplementedCase(ParamCase):
@@ -40,15 +140,18 @@ class NotImplementedCase(ParamCase):
 
 
 class BaseSimpleCollectionCase(ParamCase):
-    def inputs(self):
-        raise NotImplementedError("inputs")
-
-    def __init__(self, name, spec, arg=None):
-        super().__init__(name, spec, arg)
+    def __init__(self, name, spec, arg=None, type_name=None,
+                 is_optional=None, default=None):
+        super(BaseSimpleCollectionCase, self).__init__(
+            name, spec, arg=arg, type_name=type_name, is_optional=is_optional,
+            default=default)
 
         # If we have a simple collection, we only have a single field
         self.inner_type = spec.qiime_type.fields[0]
         self.inner_spec = ParameterSpec(self.inner_type, spec.view_type)
+
+    def inputs(self):
+        raise NotImplementedError("inputs")
 
 
 class SignatureConverter:

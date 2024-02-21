@@ -1,5 +1,5 @@
-from q2dataflow.languages.wdl.util import get_extension
-from q2dataflow.languages.wdl.templaters import make_action_template, \
+from q2dataflow.languages.cwl.util import get_extension
+from q2dataflow.languages.cwl.templaters import make_action_template, \
     make_action_template_str, store_action_template_str, BUILTIN_MAKERS
 from q2dataflow.core.signature_converter.case import make_action_template_id
 
