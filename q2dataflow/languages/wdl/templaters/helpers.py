@@ -16,6 +16,8 @@ _wdl_str_type = "String"
 _internal_to_wdl_type = {
     "Int": "Int",
     "Float": "Float",
+    "Threads": "Int",
+    "Jobs": "Int",
     QIIME_BOOL_TYPE: "Boolean",
     QIIME_STR_TYPE: _wdl_str_type,
     _wdl_file_type: _wdl_file_type

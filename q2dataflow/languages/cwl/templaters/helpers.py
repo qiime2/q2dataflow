@@ -13,6 +13,8 @@ _cwl_dir_type = "Directory"
 _internal_to_cwl_type = {
     QIIME_STR_TYPE: 'string',
     'Int': 'long',
+    'Threads': 'long',
+    'Jobs': 'long',
     QIIME_BOOL_TYPE: 'boolean',
     'Float': 'double',
     'Color': 'string',
