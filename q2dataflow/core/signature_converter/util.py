@@ -40,7 +40,7 @@ def get_mystery_stew(desired_filters=None):
 
         test_plugin = create_plugin(**desired_filters)
 
-        pm.add_plugin(test_plugin)
+    pm.add_plugin(test_plugin)
 
     return pm.get_plugin(id='mystery_stew')
 
