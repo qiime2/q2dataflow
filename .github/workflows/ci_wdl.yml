@@ -55,4 +55,4 @@ jobs:
         shell: bash -el {0}
         env:
           SKIP_SLEEP: true
-        run: MYSTERY_STEW=1 pytest -v -x --docker-image 'localhost:5000/qiime2/testq2dataflow'
+        run: pytest -v -x --docker-image 'localhost:5000/qiime2/testq2dataflow'
