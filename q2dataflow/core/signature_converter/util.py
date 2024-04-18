@@ -28,7 +28,7 @@ def get_mystery_stew(desired_filters=None):
     from q2_mystery_stew.plugin_setup import create_plugin
     from q2_mystery_stew.generators import FILTERS
 
-    pm = sdk.PluginManager(add_plugins=False)
+    pm = sdk.PluginManager.reuse_existing()
 
     if desired_filters is not None:
         _check_filters(desired_filters, FILTERS)

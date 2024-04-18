@@ -16,7 +16,7 @@ class WdlTestUsage(DataflowTestUsage):
     def make_config_file(self, working_dir):
         config_str = f"""[task_runtime]
         defaults = {{
-                "docker": "{self._settings.docker_image}:latest"
+                "docker": "{self._settings['docker_image']}:latest"
             }}
         """
         config_fp = os.path.join(working_dir, self.config_fname)
