@@ -136,7 +136,7 @@ class ParamCase:
 
 class NotImplementedCase(ParamCase):
     def inputs(self, **attributes):
-        raise NotImplementedError("inputs")
+        raise NotImplementedError(f'{self.name} has an unsupported type.')
 
 
 class BaseSimpleCollectionCase(ParamCase):

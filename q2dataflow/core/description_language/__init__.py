@@ -54,9 +54,9 @@ def _template_action_iter(plugin, action, directory, templater_lib, settings):
         # generate a string holding the action template in the relevant language
         action_template_str = templater_lib.make_action_template_str(
             plugin, action, settings=settings)
-    except Exception as ex:  # noqa E722
+    except Exception as ex:
         yield {'status': 'error', 'type': 'file',
-               'path': plugin.id + "_" + action.id}
+               'path': plugin.id + "_" + action.id, 'msg': repr(ex)}
 
     if action_template_str:
         # write out the action template string to the filepath specified;
