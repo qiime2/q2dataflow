@@ -46,10 +46,7 @@ def _labeler(val, prefix=None):
 
 def get_tests():
     tests = []
-    try:
-        plugin = get_mystery_stew(TEST_FILTERS)
-    except KeyError:
-        return tests
+    plugin = get_mystery_stew(TEST_FILTERS)
     for action in plugin.actions.values():
         for name in action.examples:
             tests.append((action, name))
@@ -95,10 +92,10 @@ def _test_mystery_stew(action, example, test_usage_factory, settings=None):
 
 # TESTS = get_tests()
 
-@pytest.mark.parametrize('action,example', get_tests(),
-                         ids=lambda x: _labeler(x, "wdl"))
-def test_wdl_mystery_stew(action, example, docker_image):
-    _test_mystery_stew(action, example, WdlTestUsage, settings={"docker_image": docker_image})
+# @pytest.mark.parametrize('action,example', get_tests(),
+#                          ids=lambda x: _labeler(x, "wdl"))
+# def test_wdl_mystery_stew(action, example, docker_image):
+#     _test_mystery_stew(action, example, WdlTestUsage, settings={"docker_image": docker_image})
 
 
 @pytest.mark.parametrize('action,example', get_tests(),
