@@ -46,7 +46,10 @@ def _labeler(val, prefix=None):
 
 def get_tests():
     tests = []
-    plugin = get_mystery_stew(TEST_FILTERS)
+    try:
+        plugin = get_mystery_stew(TEST_FILTERS)
+    except KeyError:
+        return tests
     for action in plugin.actions.values():
         for name in action.examples:
             tests.append((action, name))
