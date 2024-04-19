@@ -92,10 +92,10 @@ def _test_mystery_stew(action, example, test_usage_factory, settings=None):
 
 # TESTS = get_tests()
 
-# @pytest.mark.parametrize('action,example', get_tests(),
-#                          ids=lambda x: _labeler(x, "wdl"))
-# def test_wdl_mystery_stew(action, example, docker_image):
-#     _test_mystery_stew(action, example, WdlTestUsage, settings={"docker_image": docker_image})
+@pytest.mark.parametrize('action,example', get_tests(),
+                         ids=lambda x: _labeler(x, "wdl"))
+def test_wdl_mystery_stew(action, example, docker_image):
+    _test_mystery_stew(action, example, WdlTestUsage, settings={"docker_image": docker_image})
 
 
 @pytest.mark.parametrize('action,example', get_tests(),
