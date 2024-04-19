@@ -33,6 +33,9 @@ def get_mystery_stew(desired_filters=None):
     except sdk.UninitializedPluginManagerError:
         pm = sdk.PluginManager(add_plugins=False)
 
+    try:
+        pm.get_plugin(id='mystery_stew')
+    except KeyError:
         if desired_filters is not None:
             _check_filters(desired_filters, FILTERS)
         else:
